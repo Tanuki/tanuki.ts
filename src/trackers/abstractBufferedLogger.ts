@@ -37,7 +37,7 @@ abstract class AbstractBufferedLogger implements IDatasetWorker {
     currentModelStats: { trainedOnDatapoints: 0, runningFaults: [] },
     lastTrainingRun: { jobId: '', trainedOnDatapoints: 0, lastChecked: '' },
     currentTrainingRun: { jobId: '', trainedOnDatapoints: 0, lastChecked: '' },
-    teacherModels: [],
+    teacherModels: ['gpt-4', 'gpt-4-32k'],
     nrOfTrainingRuns: 0,
   };
 
@@ -50,23 +50,6 @@ abstract class AbstractBufferedLogger implements IDatasetWorker {
     this.bufferRollingSize = {};
     this.writeCount = 0;
     this.writeLimit = 1000; // Save the Bloom filter every 1000 writes
-
-    // super(name, level); // Call to the superclass constructor if DatasetWorker is defined
-
-
-    this.defaultFunctionConfig = {
-      distilledModel: '',
-      currentModelStats: {
-        trainedOnDatapoints: 0,
-        runningFaults: [],
-      },
-      lastTrainingRun: {
-        trainedOnDatapoints: 0,
-      },
-      currentTrainingRun: {},
-      teacherModels: [],
-      nrOfTrainingRuns: 0,
-    };
   }
 
   abstract loadDataset(

@@ -349,6 +349,12 @@ export class LanguageModelManager {
     const teacherModels: string[] = (
       await this.functionModeler.getModels(functionDescription)
     )[1];
+
+    if (teacherModels.length === 0) {
+      throw new Error(
+        'No teacher models available for this function.'
+      );
+    }
     let valid = false;
     let retryIndex = 5;
     const f = JSON.stringify(functionDescription);
