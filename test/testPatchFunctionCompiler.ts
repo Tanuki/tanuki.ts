@@ -39,6 +39,7 @@ type UserResponse = Response<User> | { data: null; error: string };
 
 type StringType = string;
 type Input = { msg: StringType };
+
 class SentimentAnalyzer {
   static getSentiment = patch<UserResponse, Input>({ ignoreFinetuneFetching: true })`
     Evaluate the sentiment of a statement provided
@@ -48,6 +49,6 @@ class SentimentAnalyzer {
   `;*/
 }
 
-const result: UserResponse = SentimentAnalyzer.getSentiment({msg: 'This is good'});
+const result = SentimentAnalyzer.getSentiment({msg: 'This is good'});
 //const resultEmbedding: Embedding<number> = SentimentAnalyzer.getEmbedding({msg: 'This is good'});
 console.log(result);

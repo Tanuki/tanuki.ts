@@ -331,7 +331,6 @@ class PatchFunctionCompiler {
             concreteTypes
           );
 
-
           // Substitute generic type argument if applicable
           const genericIndex = this.getGenericPlaceholderIndex(member.type);
           if (genericIndex !== null) {

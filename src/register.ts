@@ -103,7 +103,7 @@ export class Register {
     }
   }
 
-  static loadFunctionDescriptionFromName(funcName: string, instance?: any): FunctionDescription {
+ /* static loadFunctionDescriptionFromName(funcName: string, instance?: any): FunctionDescription {
     // eslint-disable-next-line @typescript-eslint/ban-types
     let func: Function;
 
@@ -126,9 +126,9 @@ export class Register {
       // ... Other properties must be manually set or derived in some way
     };
 
-    return functionDescription;*/
+    return functionDescription;
     throw new Error("Method not implemented.");
-  }
+  }*/
   static loadFunctionDescription(functionName: string, docString: string): FunctionDescription {
     // Iterate over alignableSymbolicFunctions
     for (const key in this.alignableSymbolicFunctions) {
