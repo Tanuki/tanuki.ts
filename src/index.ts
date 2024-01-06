@@ -48,7 +48,7 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
       const functionName: string = getCallerInfo();
       const functionDescription: FunctionDescription = Register.loadFunctionDescription(functionName, docstring)
 
-      if (functionDescription.outputTypeDefinition == "Embedding" || /^Embedding<.*>$/.test(functionDescription.outputTypeDefinition)) {
+      if (functionDescription.outputTypeDefinition == "Embedding" || /^Embedding<.*>$/.test(<string>functionDescription.outputTypeDefinition)) {
         return embeddingModeler.call(input, functionDescription, validator) as unknown as OutputType
       } else {
         return languageModeler.call(input, functionDescription, validator) as unknown as OutputType

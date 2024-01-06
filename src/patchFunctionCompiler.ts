@@ -5,8 +5,11 @@ import { FunctionDescription } from './models/functionDescription';
 import { TypeDescription } from './models/typeDescription';
 import { FunctionType } from './models/functionType';
 import { SourceFile } from 'typescript';
+import { JSONSchema, Token, TokenStream } from './models/jsonSchema';
 
 class PatchFunctionCompiler {
+
+
   private readonly sourceFiles: ReadonlyArray<ts.SourceFile>;
   private typeChecker: ts.TypeChecker;
   private typeDefinitions: Record<string, string> = {};
@@ -37,7 +40,113 @@ class PatchFunctionCompiler {
       });
     });
 
+    patchFunctions.forEach(pf => {
+
+      const inputTypeDefinitionTokenStream = this.tokenizeTypeScriptType(
+        <string>pf.inputTypeDefinition
+      );
+
+      const outputTypeDefinitionTokenStream = this.tokenizeTypeScriptType(
+        <string>pf.outputTypeDefinition
+      );
+
+      pf.inputTypeSchema = this.parseTypeScriptTokens(
+        inputTypeDefinitionTokenStream
+      );
+
+      pf.outputTypeSchema = this.parseTypeScriptTokens(
+        outputTypeDefinitionTokenStream
+      );
+
+    });
+
     this.writeToJSON(patchFunctions);
+  }
+
+  tokenizeTypeScriptType(typeString: string): TokenStream {
+    const regex = /{|}|\|| (\w+):|[^{};:]+|;/g;
+    const tokens: TokenStream = [];
+    let match;
+
+    while ((match = regex.exec(typeString)) !== null) {
+      tokens.push(match[0].trim());
+    }
+
+    return tokens.filter(token => token); // Filter out empty tokens
+  }
+
+  parseTypeScriptTokens(tokens: TokenStream): JSONSchema {
+    let currentTokenIndex = 0;
+
+    function getNextToken(): Token {
+      return tokens[currentTokenIndex++];
+    }
+
+    function peekNextToken(): Token {
+      return tokens[currentTokenIndex];
+    }
+
+    function parseObject(): JSONSchema {
+      const schema: JSONSchema = { type: 'object', properties: {} };
+      let token = getNextToken();
+
+      while (token !== '}' && currentTokenIndex < tokens.length) {
+        if (/\w+:/.exec(token)) {
+          const propertyName = token.replace(':', '').trim();
+          schema.properties![propertyName] = parseType();
+        }
+        token = getNextToken();
+      }
+
+      return schema;
+    }
+
+    function parseType(): JSONSchema {
+      const token = getNextToken();
+
+      // Check for array types (e.g., 'string[]')
+      if (token.endsWith('[]')) {
+        const itemType = token.substring(0, token.length - 2).trim();
+        return {
+          type: 'array',
+          items: { type: itemType }
+        };
+      }
+
+      if (token === '{') {
+        return parseObject();
+      } else if (token.includes('|')) {
+        const types = token.split('|').map(s => s.trim().replace(/"/g, ''));
+        // Check if one of the union types is 'Date'
+        if (types.includes('Date')) {
+          return types.length === 1
+            ? { type: 'string', format: 'date-time' }
+            : { oneOf: types.map(t => t === 'Date' ? { type: 'string', format: 'date-time' } : { type: t }) };
+        }
+        return {
+          type: 'string',
+          enum: types
+        };
+      } else if (token.includes('&')) {
+        const types = token.split('&').map(s => s.trim().replace(/"/g, ''));
+        return { allOf: types.map(t => ({ type: t })) };
+
+      } else if (token.trim() === 'any') {
+        return {};
+      } else if (token.trim().startsWith('Record')) {
+        return {
+          type: 'object',
+          additionalProperties: true
+        };
+      } else if (token.trim() === 'Date') {
+        return { type: 'string', format: 'date-time' };
+      } else {
+        return { type: token.trim() };
+      }
+    }
+
+
+    return parseObject();
   }
 
   extractTypeDefinitions(node: ts.Node): void {
@@ -116,6 +225,8 @@ class PatchFunctionCompiler {
           docstring,
           inputTypeDefinition,
           outputTypeDefinition,
+          undefined,
+          undefined,
           FunctionType.SYMBOLIC
         );
       } else {
@@ -129,14 +240,14 @@ class PatchFunctionCompiler {
 
     return null;
   }
-  extractTypeDefinition(inputType: string): string {
+  extractTypeDefinition(type: string): string {
     for (const sourceFile of this.sourceFiles) {
-      const definition = this.findAndResolveType(inputType, sourceFile);
+      const definition = this.findAndResolveType(type, sourceFile);
       if (definition != undefined) {
         return definition;
       }
     }
-    return inputType;
+    return type;
   }
 
   findAndResolveType(
@@ -166,23 +277,13 @@ class PatchFunctionCompiler {
         ts.isInterfaceDeclaration(node) &&
         inputType === node.name.text
       ) {
-        return this.resolveInterface(node, typeAliases, interfaces, enums);
+        const members = node.members.map(member =>
+          this.resolveTypeMember(member, typeAliases, interfaces, enums)
+        );
+
+        return this.renderInterface(members);
       }
     }
-  }
-
-  resolveInterface(
-    node: ts.InterfaceDeclaration,
-    typeAliases: Map<string, ts.TypeNode>,
-    interfaces: Map<string, ts.InterfaceDeclaration>,
-    enums: Map<string, ts.EnumDeclaration>
-  ): string {
-    // Construct the type definition for the interface
-    return `{ ${node.members
-      .map(member =>
-        this.resolveTypeMember(member, typeAliases, interfaces, enums)
-      )
-      .join('; ')} }`;
   }
 
   resolveType(
@@ -218,22 +319,8 @@ class PatchFunctionCompiler {
         ? this.resolveType(alias, typeAliases, interfaces, enums, concreteTypes)
         : node.typeName.getText();
     } else if (ts.isTypeLiteralNode(node) || ts.isInterfaceDeclaration(node)) {
-      return this.extractLiterals(node, typeAliases, interfaces, enums, concreteTypes);
-    } else if (ts.isUnionTypeNode(node) || ts.isIntersectionTypeNode(node)) {
-      return node.types
-        .map(type =>
-          this.resolveType(type, typeAliases, interfaces, enums, concreteTypes)
-        )
-        .join(node.kind === ts.SyntaxKind.UnionType ? ' | ' : ' & ');
-    }
-    return node.getText();
-  }
-
-  private extractLiterals(node: ts.TypeLiteralNode | (ts.TypeNode & ts.InterfaceDeclaration), typeAliases: Map<string, ts.TypeNode>, interfaces: Map<string, ts.InterfaceDeclaration>, enums: Map<string, ts.EnumDeclaration>, concreteTypes: Map<string, string>) {
-    // Handle type literal nodes and interface declarations similarly
-    const members = ts.isTypeLiteralNode(node) ? node.members : node.members;
-    return `{ ${members
-      .map(member =>
+      const members = ts.isTypeLiteralNode(node) ? node.members : node.members;
+      const membersList = members.map(member =>
         this.resolveTypeMember(
           member,
           typeAliases,
@@ -241,8 +328,15 @@ class PatchFunctionCompiler {
           enums,
           concreteTypes
         )
-      )
-      .join("; ")} }`;
+      );
+      return this.renderLiterals(membersList);
+    } else if (ts.isUnionTypeNode(node) || ts.isIntersectionTypeNode(node)) {
+      const members = node.types.map(type =>
+        this.resolveType(type, typeAliases, interfaces, enums, concreteTypes)
+      );
+      return this.renderUnion(node, members);
+    }
+    return node.getText();
   }
 
   substituteTypeArguments(
@@ -256,7 +350,6 @@ class PatchFunctionCompiler {
     interfaces: Map<string, ts.InterfaceDeclaration>,
     enums: Map<string, ts.EnumDeclaration>
   ): string {
-
     if (ts.isTypeAliasDeclaration(typeDeclaration)) {
       // For TypeAliasDeclaration, use the 'type' property
       return this.resolveType(
@@ -268,23 +361,36 @@ class PatchFunctionCompiler {
       );
     } else if (ts.isInterfaceDeclaration(typeDeclaration)) {
       // For InterfaceDeclaration, handle by iterating over its members
-      return `{ ${typeDeclaration.members
-        .map(member =>
-          this.resolveTypeMember(
-            member,
-            typeAliases,
-            interfaces,
-            enums,
-            new Map([['T', resolvedTypeArgs[0]]])
-          )
+      const members = typeDeclaration.members.map(member =>
+        this.resolveTypeMember(
+          member,
+          typeAliases,
+          interfaces,
+          enums,
+          new Map([['T', resolvedTypeArgs[0]]])
         )
-        .join('; ')} }`;
+      );
+      return this.renderInterface(members);
     } else if (ts.isEnumDeclaration(typeDeclaration)) {
       // For EnumDeclaration, handle by iterating over its members
-      const enumMembers = typeDeclaration.members
-        .map(member => member.name.getText())
-        .join(', ');
-      return `{ ${enumMembers} }`;
+      /* const /*enumMembers = typeDeclaration.members
+         .map(member => member.name.getText())
+         .join(', ');
+       return `{ ${enumMembers} }`;*/
+
+      const enumMembers = typeDeclaration.members.map(member => {
+        // If the enum member has an initializer, use it to get the value
+        if (member.initializer) {
+          if (ts.isNumericLiteral(member.initializer)) {
+            return this.renderNumericEnumMember(member);
+          } else if (ts.isStringLiteral(member.initializer)) {
+            return this.renderNonNumericEnumMember(member);
+          }
+        }
+        return member.name.getText();
+      });
+
+      return this.renderEnum(enumMembers);
     } else if (ts.isTypeNode(typeDeclaration)) {
       // For TypeNode
       const expandedType = this.resolveConcreteType(
@@ -306,6 +412,30 @@ class PatchFunctionCompiler {
     return '';
   }
 
+  private renderNonNumericEnumMember(member: ts.EnumMember): string {
+    // Check if initializer is present and is a string literal
+    if (member.initializer && ts.isStringLiteral(member.initializer)) {
+      const value = member.initializer.text;
+      return `${member.name.getText()} = "${value}"`;
+    } else {
+      // Handle the case where initializer is not present or not a string literal
+      // Return a default representation or throw an error
+      return `${member.name.getText()} = ""`;
+    }
+  }
+
+  private renderNumericEnumMember(member: ts.EnumMember): string {
+    // Check if initializer is present and is a numeric literal
+    if (member.initializer && ts.isNumericLiteral(member.initializer)) {
+      const value = member.initializer.text;
+      return `${member.name.getText()} = ${value}`;
+    } else {
+      // Handle the case where initializer is not present or not a numeric literal
+      // Return a default representation or throw an error
+      return `${member.name.getText()} = 0`;
+    }
+  }
+
   resolveTypeMember(
     member: ts.TypeElement,
     typeAliases: Map<string, ts.TypeNode>,
@@ -321,7 +451,12 @@ class PatchFunctionCompiler {
         const memberTypeName = member.type.getText();
         // Check if the type is an enum and resolve it
         if (enums.has(memberTypeName)) {
-          propertyType = this.resolveConcreteType(memberTypeName, typeAliases, interfaces, enums);
+          propertyType = this.resolveConcreteType(
+            memberTypeName,
+            typeAliases,
+            interfaces,
+            enums
+          );
         } else {
           propertyType = this.resolveType(
             member.type,
@@ -353,7 +488,6 @@ class PatchFunctionCompiler {
     interfaces: Map<string, ts.InterfaceDeclaration>,
     enums: Map<string, ts.EnumDeclaration>
   ): string {
-
     const typeDeclaration =
       typeAliases.get(typeName) ||
       interfaces.get(typeName) ||
@@ -361,11 +495,11 @@ class PatchFunctionCompiler {
     if (typeDeclaration) {
       if (ts.isInterfaceDeclaration(typeDeclaration)) {
         // Resolve an interface declaration
-        return `{ ${typeDeclaration.members
-          .map(member =>
-            this.resolveTypeMember(member, typeAliases, interfaces, enums)
-          )
-          .join('; ')} }`;
+        const members = typeDeclaration.members.map(member =>
+          this.resolveTypeMember(member, typeAliases, interfaces, enums)
+        );
+
+        return this.renderInterface(members);
       } else if (ts.isTypeAliasDeclaration(typeDeclaration)) {
         // Resolve a type alias
         return this.resolveType(
@@ -374,22 +508,21 @@ class PatchFunctionCompiler {
           interfaces,
           enums
         );
-      } if (ts.isEnumDeclaration(typeDeclaration)) {
+      }
+      if (ts.isEnumDeclaration(typeDeclaration)) {
         // Resolve enum
-        const enumMembers = typeDeclaration.members
-          .map(member => {
-            // If the enum member has an initializer, use it to get the value
-            if (member.initializer) {
-              if (ts.isNumericLiteral(member.initializer)) {
-                return `${member.name.getText()} = ${member.initializer.text}`;
-              } else if (ts.isStringLiteral(member.initializer)) {
-                return `${member.name.getText()} = "${member.initializer.text}"`;
-              }
+        const enumMembers = typeDeclaration.members.map(member => {
+          // If the enum member has an initializer, use it to get the value
+          if (member.initializer) {
+            if (ts.isNumericLiteral(member.initializer)) {
+              return this.renderNumericEnumMember(member);
+            } else if (ts.isStringLiteral(member.initializer)) {
+              return this.renderNonNumericEnumMember(member);
             }
-            return member.name.getText();
-          })
-          .join(', ');
-        return `enum { ${enumMembers} }`;
+          }
+          return member.name.getText();
+        });
+        return this.renderEnum(enumMembers);
       }
       // Handle other cases if needed
     }
@@ -505,6 +638,29 @@ class PatchFunctionCompiler {
 
     // Default to the conventional 'dist' directory
     return PatchFunctionCompiler.defaultDistDirectory;
+  }
+
+  /**
+   * Here is where we render our types to string.
+   */
+  private renderUnion(
+    node: ts.UnionTypeNode | ts.IntersectionTypeNode,
+    members: string[]
+  ) {
+    return members.join(node.kind === ts.SyntaxKind.UnionType ? ' | ' : ' & ');
+  }
+
+  private renderLiterals(members: string[]) {
+    return `{ ${members.join('; ')} }`;
+  }
+
+  private renderInterface(members: string[]) {
+    return `{ ${members.join('; ')} }`;
+  }
+
+  private renderEnum(enumMembers: string[]) {
+    const enumString = `"${enumMembers.join('" | "')}"`;
+    return enumString;
   }
 }
 

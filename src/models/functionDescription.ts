@@ -1,24 +1,41 @@
 import * as crypto from 'crypto';
 import { FunctionType } from './functionType';
+import { JSONSchema } from './jsonSchema';
 
 class FunctionDescription {
   name: string;
   docstring: string;
-  inputTypeDefinition: string;
-  outputTypeDefinition: string;
+  inputTypeDefinition?: string
+  inputTypeSchema?: JSONSchema;
+  outputTypeDefinition?: string;
+  outputTypeSchema?: JSONSchema;
   type: FunctionType = FunctionType.SYMBOLIC;
 
   constructor(
     name: string,
     docstring: string,
-    inputTypeDefinition: string,
-    outputTypeDefinition: string,
+    inputTypeDefinition?: string,
+    outputTypeDefinition?: string,
+    inputTypeSchema?: JSONSchema,
+    outputTypeSchema?: JSONSchema,
     type: FunctionType = FunctionType.SYMBOLIC
   ) {
     this.name = name;
     this.docstring = docstring;
-    this.inputTypeDefinition = inputTypeDefinition;
-    this.outputTypeDefinition = outputTypeDefinition;
+    if (inputTypeDefinition != null) {
+      this.inputTypeDefinition = inputTypeDefinition;
+    }
+    if (outputTypeDefinition != null) {
+      this.outputTypeDefinition = outputTypeDefinition;
+    }
+    if (inputTypeSchema != null) {
+      this.inputTypeSchema = inputTypeSchema;
+    }
+    if (outputTypeSchema != null) {
+      this.outputTypeSchema = outputTypeSchema;
+    }
+    //this.inputTypeSchema = inputTypeSchema;
+    //this.outputTypeSchema = outputTypeSchema;
     this.type = type;
   }
 

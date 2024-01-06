@@ -3,12 +3,15 @@ import { FunctionType } from "./models/functionType";
 import PatchFunctionCompiler from "./patchFunctionCompiler";
 import fs from "fs";
 import path from "path";
+import { JSONSchema } from "./models/jsonSchema";
 
 interface FunctionDescriptionJSON {
   name: string;
   docstring: string;
   inputTypeDefinition: string;
   outputTypeDefinition: string;
+  inputTypeSchema: JSONSchema;
+  outputTypeSchema: JSONSchema;
   type?: FunctionType; // Optional if not always present
 }
 
@@ -44,8 +47,10 @@ export class Register {
       return new FunctionDescription(
         item.name,
         item.docstring,
-        item.inputTypeDefinition,
-        item.outputTypeDefinition,
+        undefined,
+        undefined,
+        item.inputTypeSchema,
+        item.outputTypeSchema,
         item.type ?? FunctionType.SYMBOLIC
       );
     });

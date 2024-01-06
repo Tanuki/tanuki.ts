@@ -69,7 +69,7 @@ export class LanguageModelManager {
     const choiceParsed = this.parseChoice(output);
     const isValid = validator.checkType(
       choiceParsed,
-      functionDescription.outputTypeDefinition
+      <string>functionDescription.outputTypeDefinition
     );
 
     if (!isValid) {
@@ -358,7 +358,7 @@ export class LanguageModelManager {
     let valid = false;
     let retryIndex = 5;
     const f = JSON.stringify(functionDescription);
-    const typeHint = functionDescription.outputTypeDefinition;
+    const typeHint = <string>functionDescription.outputTypeDefinition;
     const error = `Output type was not valid. Expected a valid object of type ${typeHint}, got '${choice}'`;
     const failedOutputsList: [string, string][] = [[choice, error]];
     let choiceParsed: any;
@@ -401,10 +401,10 @@ export class LanguageModelManager {
 
       valid = validator.checkType(
         choiceParsed,
-        functionDescription.outputTypeDefinition
+        <string>functionDescription.outputTypeDefinition
       );
       if (!valid) {
-        const error = `Output type was not valid. Expected an object of type ${functionDescription.outputTypeDefinition}, got '${choice}'`;
+        const error = `Output type was not valid. Expected an object of type ${<string>functionDescription.outputTypeDefinition}, got '${choice}'`;
         failedOutputsList.push([choice, error]);
         retryIndex--;
       }
