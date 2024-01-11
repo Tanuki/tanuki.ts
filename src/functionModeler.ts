@@ -4,9 +4,9 @@ import { FunctionExample } from './models/functionExample';
 import { IDatasetWorker } from './trackers/IDatasetWorker';
 import { approximateTokenCount, decodeInt, encodeInt } from './utils';
 import { FunctionDescription } from './models/functionDescription';
-import { PatchConfig } from "./models/patchConfig";
-import { FunctionConfig } from "./models/functionConfig";
-import { EXAMPLE_ELEMENT_LIMIT } from "./constants";
+import { PatchConfig } from './models/patchConfig';
+import { FunctionConfig } from './models/functionConfig';
+import { EXAMPLE_ELEMENT_LIMIT } from './constants';
 // Define an interface for the expected structure of FunctionExample data
 interface FunctionExampleData {
   args: any[];
@@ -30,7 +30,7 @@ export class FunctionModeler {
   constructor(
     dataWorker: IDatasetWorker,
     apiProviders: Record<string, LLMFinetuneAPI> = {},
-    environmentId = 0,
+    environmentId = 0
   ) {
     this.functionConfigs = {};
     this.dataWorker = dataWorker;
@@ -81,13 +81,12 @@ export class FunctionModeler {
   saveEmbeddableAlignStatements(
     functionHash: string,
     args: any[],
-    kwargs: Record<string, any>,
+    //kwargs: Record<string, any>,
     positivePairs: Array<[any[], Record<string, any>]>,
     negativePairs: Array<[any[], Record<string, any>]>
   ): void {
     // Prepare args and kwargs for saving
     const parsedArgs = this.prepareObjectForSaving(args);
-    const parsedKwargs = this.prepareObjectForSaving(kwargs);
 
     // Prepare positive and negative pairs for saving
     const parsedPositivePairs = positivePairs.map(pair =>
@@ -99,29 +98,17 @@ export class FunctionModeler {
 
     // Save the contrastive pairs
     parsedPositivePairs.forEach(pair => {
-      this.saveContrastiveAlignmentPair(
-        functionHash,
-        parsedArgs,
-        parsedKwargs,
-        pair,
-        true
-      );
+      this.saveContrastiveAlignmentPair(functionHash, parsedArgs, pair, true);
     });
     parsedNegativePairs.forEach(pair => {
-      this.saveContrastiveAlignmentPair(
-        functionHash,
-        parsedArgs,
-        parsedKwargs,
-        pair,
-        false
-      );
+      this.saveContrastiveAlignmentPair(functionHash, parsedArgs, pair, false);
     });
   }
 
   private saveContrastiveAlignmentPair(
     functionHash: string,
     args: any[],
-    kwargs: Record<string, any>,
+    //kwargs: Record<string, any>,
     pair: [any[], Record<string, any>],
     positive: boolean
   ): void {
@@ -176,7 +163,6 @@ export class FunctionModeler {
   saveSymbolicAlignStatements(
     functionHash: string,
     args: any[],
-    kwargs: Record<string, any>,
     output: any
   ): void {
     const parsedOutput = this.prepareObjectForSaving(output);
@@ -270,10 +256,7 @@ export class FunctionModeler {
       try {
         const exampleObj = JSON.parse(exampleStr) as FunctionExampleData;
         // Assuming exampleObj has properties args, kwargs, and output
-        const example = new FunctionExample(
-          exampleObj.args,
-          exampleObj.output
-        );
+        const example = new FunctionExample(exampleObj.args, exampleObj.output);
 
         examples.push(example);
       } catch (error) {
@@ -377,12 +360,15 @@ export class FunctionModeler {
               false,
               {
                 distilledModel: '',
-                currentModelStats: { trainedOnDatapoints: 0, runningFaults: [] },
+                currentModelStats: {
+                  trainedOnDatapoints: 0,
+                  runningFaults: [],
+                },
                 lastTrainingRun: { trainedOnDatapoints: 0 },
                 currentTrainingRun: {},
                 teacherModels: ['gpt-4', 'gpt-4-32k'],
                 nrOfTrainingRuns: 0,
-              }
+              },
             ];
           }
         }
@@ -398,7 +384,7 @@ export class FunctionModeler {
         currentTrainingRun: {},
         teacherModels: ['gpt-4', 'gpt-4-32k'],
         nrOfTrainingRuns: 0,
-      }
+      },
     ];
   }
 
@@ -419,12 +405,15 @@ export class FunctionModeler {
 
     return {
       distilledModel: model,
-      currentModelStats: { trainedOnDatapoints: nrOfTrainingPoints, runningFaults: [] },
+      currentModelStats: {
+        trainedOnDatapoints: nrOfTrainingPoints,
+        runningFaults: [],
+      },
       lastTrainingRun: { trainedOnDatapoints: nrOfTrainingPoints },
       currentTrainingRun: {},
       teacherModels: ['gpt-4', 'gpt-4-32k'],
       nrOfTrainingRuns: nrOfTrainingRuns,
-    }
+    };
   }
 
   async getModels(
@@ -434,9 +423,9 @@ export class FunctionModeler {
     let funcConfig: FunctionConfig;
 
     if (funcHash in this.functionConfigs) {
-      funcConfig = this.functionConfigs[funcHash] ;
+      funcConfig = this.functionConfigs[funcHash];
     } else {
-      funcConfig = await this.loadFunctionConfig(funcHash, functionDescription) ;
+      funcConfig = await this.loadFunctionConfig(funcHash, functionDescription);
     }
 
     let distilledModel = '';
@@ -553,6 +542,7 @@ export class FunctionModeler {
 
     const instruction =
       'You are given below a function description and input data...';
+
     // Construct finetuning dataset
     const finetuningDataset = dataset.map(x => ({
       messages: [
@@ -630,7 +620,8 @@ export class FunctionModeler {
     if (status === 'failed') {
       this.functionConfigs[funcHash].currentTrainingRun = {};
     } else {
-      this.functionConfigs[funcHash].distilledModel = response.fineTunedModel ?? '';
+      this.functionConfigs[funcHash].distilledModel =
+        response.fineTunedModel ?? '';
 
       const trainedOnDatapoints =
         this.functionConfigs[funcHash].currentTrainingRun.trainedOnDatapoints ??

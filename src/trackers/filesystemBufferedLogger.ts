@@ -99,12 +99,11 @@ export class FilesystemBufferedLogger extends AbstractBufferedLogger {
   }
 
   loadExistingDatasets(): Record<string, Record<string, number>> {
-    const datasetLengths: Record<string, Record<string, number>> = {
-      SYMBOLIC_ALIGNMENTS: {},
-      POSITIVE_EMBEDDABLE_ALIGNMENTS: {},
-      NEGATIVE_EMBEDDABLE_ALIGNMENTS: {},
-      PATCHES: {}
-    };
+    const datasetLengths: Record<string, Record<string, number>> = {}
+    datasetLengths[SYMBOLIC_ALIGNMENTS] = {};
+    datasetLengths[POSITIVE_EMBEDDABLE_ALIGNMENTS] = {};
+    datasetLengths[NEGATIVE_EMBEDDABLE_ALIGNMENTS] = {};
+    datasetLengths[PATCHES] = {};
 
     if (!existsSync(this.logDirectory)) {
       mkdirSync(this.logDirectory, { recursive: true });
@@ -117,7 +116,16 @@ export class FilesystemBufferedLogger extends AbstractBufferedLogger {
         file.includes(POSITIVE_FILE_EXTENSION) ? POSITIVE_EMBEDDABLE_ALIGNMENTS :
           file.includes(NEGATIVE_FILE_EXTENSION) ? NEGATIVE_EMBEDDABLE_ALIGNMENTS : PATCHES;
       const funcHash = file.replace(new RegExp(`(${ALIGN_FILE_EXTENSION}|${PATCH_FILE_EXTENSION}|${POSITIVE_FILE_EXTENSION}|${NEGATIVE_FILE_EXTENSION})$`), '');
-      datasetLengths[datasetType][funcHash] = -1;
+
+      if (file.includes(ALIGN_FILE_EXTENSION)) {
+        datasetLengths[SYMBOLIC_ALIGNMENTS][funcHash] = -1;
+      } else if (file.includes(POSITIVE_FILE_EXTENSION)) {
+        datasetLengths[POSITIVE_EMBEDDABLE_ALIGNMENTS][funcHash] = -1;
+      } else if (file.includes(NEGATIVE_FILE_EXTENSION)) {
+        datasetLengths[NEGATIVE_EMBEDDABLE_ALIGNMENTS][funcHash] = -1;
+      } else if (file.includes(PATCH_FILE_EXTENSION)) {
+        datasetLengths[PATCHES][funcHash] = -1;
+      }
     }
 
     return datasetLengths;

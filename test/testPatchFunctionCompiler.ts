@@ -1,8 +1,7 @@
-import { patch, align } from '../src';
-import { Tanuki } from '../src/tanuki';
+import { Tanuki, patch } from '../src/tanuki';
 import {Embedding} from "../src/models/embedding";
 
-new Tanuki()
+const tanuki = new Tanuki()
 
 type StringAlias = string;
 
@@ -13,6 +12,11 @@ enum Status {
   Unknown
 }
 
+enum Sentiment {
+  Positive,
+  Negative,
+  Neutral
+}
 // Interface with various property types
 interface User {
   id: number;
@@ -41,14 +45,41 @@ type StringType = string;
 type Input = { msg: StringType };
 
 class SentimentAnalyzer {
-  static getSentiment = patch<UserResponse, Input>({ ignoreFinetuneFetching: true })`
-    Evaluate the sentiment of a statement provided
-  `;
-  /*static getEmbedding = patch<Embedding<number>, Input>()`
-    Get the embedding of a statement provided
-  `;*/
+  static doubleNumber = patch<number, number>()`Double the input number`;
+
+  static getSentiment = patch<Sentiment, Input>({ ignoreFinetuneFetching: true })
+    `Evaluate the sentiment of a statement provided`;
+
+  static getEmbedding = patch<Embedding<number>, Input>()
+    `Get the embedding of a statement provided`;
 }
 
-const result = SentimentAnalyzer.getSentiment({msg: 'This is good'});
+const doubledNumber: number = SentimentAnalyzer.doubleNumber(2);
+
+console.log(doubledNumber);
+
+const result: Sentiment = SentimentAnalyzer.getSentiment({msg: 'This is good'});
 //const resultEmbedding: Embedding<number> = SentimentAnalyzer.getEmbedding({msg: 'This is good'});
 console.log(result);
+
+Tanuki.align((it) => {
+  it("should evaluate clearly true statements as true", (expect) => {
+    expect(SentimentAnalyzer.getSentiment({ msg: 'This is good' })).toMatchObject({
+      data: {
+        name: 'This is good',
+      }
+    })
+
+    expect(
+      SentimentAnalyzer.getEmbedding({ msg: 'This is good' })
+    ).toEqual(
+      SentimentAnalyzer.getEmbedding({ msg: 'This is great' })
+    )
+
+    expect(SentimentAnalyzer.getSentiment({ msg: 'This is good' })).toEqual({
+      data: {
+        name: 'This is good',
+      }
+    })
+  })
+})

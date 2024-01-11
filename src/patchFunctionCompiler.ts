@@ -1,11 +1,10 @@
-import * as ts from 'typescript';
-import * as fs from 'fs';
-import * as path from 'path';
-import { FunctionDescription } from './models/functionDescription';
-import { TypeDescription } from './models/typeDescription';
-import { FunctionType } from './models/functionType';
-import { SourceFile } from 'typescript';
-import { JSONSchema, Token, TokenStream } from './models/jsonSchema';
+import * as ts from "typescript";
+import { SourceFile } from "typescript";
+import * as fs from "fs";
+import * as path from "path";
+import { FunctionDescription } from "./models/functionDescription";
+import { FunctionType } from "./models/functionType";
+import { JSONSchema, Token, TokenStream } from "./models/jsonSchema";
 
 class PatchFunctionCompiler {
 
@@ -51,10 +50,12 @@ class PatchFunctionCompiler {
       );
 
       pf.inputTypeSchema = this.parseTypeScriptTokens(
+        pf.name,
         inputTypeDefinitionTokenStream
       );
 
       pf.outputTypeSchema = this.parseTypeScriptTokens(
+        pf.name,
         outputTypeDefinitionTokenStream
       );
 
@@ -75,7 +76,7 @@ class PatchFunctionCompiler {
     return tokens.filter(token => token); // Filter out empty tokens
   }
 
-  parseTypeScriptTokens(tokens: TokenStream): JSONSchema {
+  parseTypeScriptTokens(name: string, tokens: TokenStream): JSONSchema {
     let currentTokenIndex = 0;
 
     function getNextToken(): Token {
@@ -98,7 +99,13 @@ class PatchFunctionCompiler {
         token = getNextToken();
       }
 
-      return schema;
+      // Handle primitive types (number, string, boolean)
+      const primitiveTypes = ['number', 'string', 'boolean', 'null'];
+      if (primitiveTypes.includes(token)) {
+        return { type: token };
+      } else {
+        return schema;
+      }
     }
 
     function parseType(): JSONSchema {
@@ -146,7 +153,11 @@ class PatchFunctionCompiler {
     }
 
 
-    return parseObject();
+    const schema = parseObject();
+    schema.$id = name;
+    schema.$schema = "http://json-schema.org/draft-07/schema#";
+
+    return schema;
   }
 
   extractTypeDefinitions(node: ts.Node): void {
@@ -220,6 +231,8 @@ class PatchFunctionCompiler {
         const inputTypeDefinition = this.extractTypeDefinition(inputType);
         const outputTypeDefinition = this.extractTypeDefinition(outputType);
 
+        const type = (!outputTypeDefinition.startsWith('Embedding')) ? FunctionType.SYMBOLIC : FunctionType.EMBEDDABLE
+
         return new FunctionDescription(
           name,
           docstring,
@@ -227,7 +240,7 @@ class PatchFunctionCompiler {
           outputTypeDefinition,
           undefined,
           undefined,
-          FunctionType.SYMBOLIC
+          type
         );
       } else {
         console.log('Type arguments not found or not in expected format');
@@ -624,6 +637,25 @@ class PatchFunctionCompiler {
 
     // Write the JSON content to the output file
     fs.writeFileSync(outputPath, jsonContent);
+  }
+
+  static loadFromJSON(): FunctionDescription[] {
+    // Define the input file path (assumed to be the same as output path in writeToJSON)
+    const distDirectory = PatchFunctionCompiler.getDistDirectory();
+    const inputPath = path.join(distDirectory, 'output.json');
+
+    // Check if the file exists
+    if (!fs.existsSync(inputPath)) {
+      throw new Error('JSON file does not exist.');
+    }
+
+    // Read the JSON content from the file
+    const jsonContent = fs.readFileSync(inputPath, 'utf8');
+
+    // Parse the JSON content and convert it to FunctionDescription objects
+    const patchFunctions = JSON.parse(jsonContent) as FunctionDescription[];
+
+    return patchFunctions;
   }
 
   static getDistDirectory(): string {

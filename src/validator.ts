@@ -1,20 +1,23 @@
-import ts from 'typescript';
-import { TypeDescription } from './models/typeDescription';
-
-interface JsonSchema {
-  type?: string;
-  properties?: Record<string, JsonSchema>;
-  items?: JsonSchema;
-  // Add other JSON Schema properties as needed, like 'required', 'enum', 'oneOf', etc.
-}
+import Ajv, { JSONSchemaType } from "ajv";
+import addFormats from 'ajv-formats';
+import { JSONSchema } from "./models/jsonSchema";
 
 export class Validator {
-  checkType(value: any, typeDefinition: string): boolean {
-    // Step 1: Parse the type definition
-    //const parsedType: JsonSchema = this.parseTypeDefinition(typeDefinition);
 
-    // Step 2: Validate the value against the parsed type
-    return false//validateValueAgainstType(value, parsedType);
+  private ajv: Ajv;
+
+  constructor() {
+    this.ajv = new Ajv();
+    addFormats(this.ajv);
+  }
+
+  checkType<T>(value: T, typeDefinition: JSONSchema): boolean {
+    // Validate the value against the JSON Schema
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
+    const validate = this.ajv.compile(typeDefinition);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+    const isValid = validate(value) as boolean;
+    return isValid;
   }
 
   instantiate<T>(type: { new (...args: any[]): T }, ...args: any[]): T {
