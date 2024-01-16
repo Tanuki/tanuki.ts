@@ -7,6 +7,7 @@ import { FunctionDescription } from './models/functionDescription';
 import { PatchConfig } from './models/patchConfig';
 import { FunctionConfig } from './models/functionConfig';
 import { EXAMPLE_ELEMENT_LIMIT } from './constants';
+import functionModeler from "./functionModeler";
 // Define an interface for the expected structure of FunctionExample data
 interface FunctionExampleData {
   args: any[];
@@ -15,22 +16,22 @@ interface FunctionExampleData {
 }
 
 export class FunctionModeler {
+  public distillationTokenLimit: number;
+  public static environmentId: number;
+  public static checkFinetuneBlacklist: Set<string>;
+  public static executeFinetuneBlacklist: Set<string>;
+  public static storeDataBlacklist: Set<string>;
   private functionConfigs: Record<string, FunctionConfig>;
   private dataWorker: IDatasetWorker;
-  public distillationTokenLimit: number;
   private symbolicAlignBuffer: Record<string, any>;
   private embeddableAlignBuffer: Record<string, any>;
   private datasetSizes: Record<string, Record<string, number>>;
-  private environmentId: number;
-  private checkFinetuneBlacklist: string[];
-  private executeFinetuneBlacklist: string[];
-  private storeDataBlacklist: string[];
   private apiProviders: Record<string, LLMFinetuneAPI>;
 
   constructor(
     dataWorker: IDatasetWorker,
     apiProviders: Record<string, LLMFinetuneAPI> = {},
-    environmentId = 0
+    //environmentId = 0
   ) {
     this.functionConfigs = {};
     this.dataWorker = dataWorker;
@@ -38,10 +39,10 @@ export class FunctionModeler {
     this.symbolicAlignBuffer = {};
     this.embeddableAlignBuffer = {};
     this.datasetSizes = this.getDatasets();
-    this.environmentId = environmentId;
-    this.checkFinetuneBlacklist = [];
-    this.executeFinetuneBlacklist = [];
-    this.storeDataBlacklist = [];
+    //FunctionModeler.environmentId = environmentId;
+    FunctionModeler.checkFinetuneBlacklist = new Set<string>();
+    FunctionModeler.executeFinetuneBlacklist = new Set<string>();
+    FunctionModeler.storeDataBlacklist = new Set<string>();
     this.datasetSizes = {
       POSITIVE_EMBEDDABLE_ALIGNMENTS: {},
       NEGATIVE_EMBEDDABLE_ALIGNMENTS: {},
@@ -53,17 +54,17 @@ export class FunctionModeler {
     this.apiProviders = apiProviders;
   }
 
-  public setConfig(functionHash: string, config: PatchConfig) {
-    this.environmentId = config.environmentId ?? 0;
+  public static setConfig(functionHash: string, config: PatchConfig) {
+    functionModeler.environmentId = config.environmentId ?? 0;
 
     if (config.ignoreFinetuning) {
-      this.executeFinetuneBlacklist.push(functionHash);
+      functionModeler.executeFinetuneBlacklist.add(functionHash);
     }
     if (config.ignoreFinetuneFetching) {
-      this.checkFinetuneBlacklist.push(functionHash);
+      functionModeler.checkFinetuneBlacklist.add(functionHash);
     }
     if (config.ignoreDataStorage) {
-      this.storeDataBlacklist.push(functionHash);
+      functionModeler.storeDataBlacklist.add(functionHash);
     }
   }
   private getDatasetInfo(
@@ -116,7 +117,7 @@ export class FunctionModeler {
     let successfullySaved = false;
     let newDatapoint = true;
 
-    if (!this.storeDataBlacklist.includes(functionHash)) {
+    if (!functionModeler.storeDataBlacklist.has(functionHash)) {
       // Assuming dataWorker has a method to log embeddable align
       [successfullySaved, newDatapoint] = this.dataWorker.logEmbeddableAlign(
         functionHash,
@@ -173,7 +174,7 @@ export class FunctionModeler {
     let successfullySaved = false;
     let newDatapoint = true;
 
-    if (!this.storeDataBlacklist.includes(functionHash)) {
+    if (!functionModeler.storeDataBlacklist.has(functionHash)) {
       [successfullySaved, newDatapoint] = this.dataWorker.logSymbolicAlign(
         functionHash,
         example
@@ -273,12 +274,12 @@ export class FunctionModeler {
   }
 
   loadSymbolicAlignStatements(functionHash: string): void {
-    if (this.storeDataBlacklist.includes(functionHash)) {
+    if (functionModeler.storeDataBlacklist.has(functionHash)) {
       this.datasetSizes.SYMBOLIC_ALIGNMENTS[functionHash] = 0;
       this.symbolicAlignBuffer[functionHash] = new Uint8Array();
     } else if (!this.symbolicAlignBuffer[functionHash]) {
       const [datasetSize, alignDataset] = this.getDatasetInfo(
-        'SYMBOLIC_ALIGNMENTS',
+        "SYMBOLIC_ALIGNMENTS",
         functionHash,
         'both'
       ) as [number, string];
@@ -297,7 +298,7 @@ export class FunctionModeler {
     repaired = true
   ): Promise<void> {
     try {
-      if (!this.storeDataBlacklist.includes(funcHash)) {
+      if (!functionModeler.storeDataBlacklist.has(funcHash)) {
         const added = this.saveSymbolicDatapoint(funcHash, example);
         if (added) {
           this.updateDatapointConfig(repaired, funcHash);
@@ -306,7 +307,7 @@ export class FunctionModeler {
     } catch (error) {
       console.error('Could not add datapoint to training data', error);
     }
-    if (!this.executeFinetuneBlacklist.includes(funcHash)) {
+    if (!functionModeler.executeFinetuneBlacklist.has(funcHash)) {
       await this.checkForFinetuning(functionDescription, funcHash);
     }
   }
@@ -316,7 +317,7 @@ export class FunctionModeler {
     functionDescription: FunctionDescription
   ): Promise<FunctionConfig> {
     const [config, defaultUsed] = this.dataWorker.loadFunctionConfig(funcHash);
-    if (defaultUsed && !this.checkFinetuneBlacklist.includes(funcHash)) {
+    if (defaultUsed && !functionModeler.checkFinetuneBlacklist.has(funcHash)) {
       const [finetuned, finetuneConfig] = await this.checkForFinetunes(
         functionDescription
       );
@@ -333,7 +334,7 @@ export class FunctionModeler {
     functionDescription: FunctionDescription
   ): Promise<[boolean, FunctionConfig]> {
     const finetuneHash =
-      functionDescription.hash('finetune') + encodeInt(this.environmentId);
+      functionDescription.hash('finetune') + encodeInt(functionModeler.environmentId);
     const finetunes: FinetuneJob[] = await this.apiProviders[
       'openai'
     ].listFinetuned(1000);
@@ -516,6 +517,13 @@ export class FunctionModeler {
     functionDescription: FunctionDescription,
     funcHash: string
   ): Promise<void> {
+    /**
+    Execute the finetuning
+    First create the OpenAI compatible dataset with jsonL file and upload it
+    Then submit the OpenAI finetuning job
+    Finally update the config file to reflect the new finetuning job as current
+    **/
+
     const functionString = JSON.stringify(functionDescription);
 
     const alignDataset: string = this.getDatasetInfo(
@@ -540,15 +548,27 @@ export class FunctionModeler {
       .filter(x => x !== '')
       .map(x => JSON.parse(x) as FunctionExample);
 
-    const instruction =
-      'You are given below a function description and input data...';
+    const instruction = "You are given below a function description and input data. The function description of what the function must carry out can be found in the Function section, with input and output type hints. The input data can be found in Input section. Using the function description, apply the function to the Input and return a valid output type, that is acceptable by the outputClassDefinition and outputClassHint. Return null if you can't apply the function to the input or if the output is optional and the correct output is null.\nINCREDIBLY IMPORTANT: Only output a JSON-compatible string in the correct response format."
 
     // Construct finetuning dataset
-    const finetuningDataset = dataset.map(x => ({
-      messages: [
-        // ... construct messages based on x ...
-      ],
-    }));
+    const finetuningDataset = dataset.map(x => {
+      return ({
+        messages: [
+          {
+            role: 'system',
+            content: `You are a skillful and accurate language model, who applies a described function on input data. Make sure the function is applied accurately and correctly and the outputs follow the output type hints and are valid outputs given the output types.`
+          },
+          {
+            role: 'user',
+            content: `${instruction}\nFunction: ${functionString}---\nInputs:\nArgs: ${JSON.stringify(x.args)}\nOutput:`
+          },
+          {
+            role: 'assistant',
+            content: x.output !== null ? JSON.stringify(x.output) : 'None',
+          }
+        ]
+      });
+    });
 
     // Create a string representation of the dataset
     const datasetString = finetuningDataset
@@ -558,7 +578,7 @@ export class FunctionModeler {
     // Create the finetune hash
     const finetuneHash =
       functionDescription.hash('finetune') +
-      encodeInt(this.environmentId) +
+      encodeInt(functionModeler.environmentId) +
       encodeInt(this.functionConfigs[funcHash].nrOfTrainingRuns);
 
     try {

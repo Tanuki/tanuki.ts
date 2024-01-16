@@ -1,8 +1,9 @@
-import { OpenAI, toFile } from "openai"; // Assuming 'openai' is a TypeScript package
+import 'openai/shims/node';
+import { OpenAI, toFile } from 'openai';
 import { Embedding } from '../models/embedding';
 import { FinetuneJob } from '../models/finetuneJob';
 
-import axios from 'axios';
+import axios from 'redaxios';
 import { CreateEmbeddingResponse } from 'openai/resources';
 import { Readable } from 'stream';
 

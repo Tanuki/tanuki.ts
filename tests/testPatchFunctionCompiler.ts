@@ -1,5 +1,5 @@
 import { Tanuki, patch } from '../src/tanuki';
-import {Embedding} from "../src/models/embedding";
+import { Embedding } from '../src/models/embedding';
 
 const tanuki = new Tanuki()
 
@@ -47,6 +47,8 @@ type Input = { msg: StringType };
 class SentimentAnalyzer {
   static doubleNumber = patch<number, number>()`Double the input number`;
 
+  static isActive = patch<Status, string>()`Check if the string is active`;
+
   static getSentiment = patch<Sentiment, Input>({ ignoreFinetuneFetching: true })
     `Evaluate the sentiment of a statement provided`;
 
@@ -54,14 +56,26 @@ class SentimentAnalyzer {
     `Get the embedding of a statement provided`;
 }
 
-const doubledNumber: number = SentimentAnalyzer.doubleNumber(2);
 
-console.log(doubledNumber);
+(async () => {
+  const active = await SentimentAnalyzer.isActive('active');
+  console.log(active)
+  const doubled = await SentimentAnalyzer.doubleNumber(2);
+  console.log(doubled);
+  const sentiment: Sentiment = await SentimentAnalyzer.getSentiment({msg: 'This is good'});
+  console.log(sentiment);
+  // Rest of your async code
+})().catch(err => console.error(err));
 
-const result: Sentiment = SentimentAnalyzer.getSentiment({msg: 'This is good'});
+
+const result: Promise<Sentiment> = SentimentAnalyzer.getSentiment({msg: 'This is good'});
 //const resultEmbedding: Embedding<number> = SentimentAnalyzer.getEmbedding({msg: 'This is good'});
 console.log(result);
 
+void SentimentAnalyzer.getSentiment({msg: 'This is good'}).then((result) => {
+  console.log(result);
+  return result;
+});
 Tanuki.align((it) => {
   it("should evaluate clearly true statements as true", (expect) => {
     expect(SentimentAnalyzer.getSentiment({ msg: 'This is good' })).toMatchObject({
@@ -69,13 +83,11 @@ Tanuki.align((it) => {
         name: 'This is good',
       }
     })
-
     expect(
       SentimentAnalyzer.getEmbedding({ msg: 'This is good' })
     ).toEqual(
       SentimentAnalyzer.getEmbedding({ msg: 'This is great' })
     )
-
     expect(SentimentAnalyzer.getSentiment({ msg: 'This is good' })).toEqual({
       data: {
         name: 'This is good',

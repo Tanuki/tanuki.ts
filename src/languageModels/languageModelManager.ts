@@ -100,7 +100,7 @@ export class LanguageModelManager {
 
     if (output.suitableForFinetuning && !output.distilledModel) {
       await this.functionModeler.postprocessSymbolicDatapoint(
-        functionDescription.hash(), // Assuming FunctionDescription has a method hash()
+        functionDescription.hash(),
         functionDescription,
         datapoint,
         !isValid

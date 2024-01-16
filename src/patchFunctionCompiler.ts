@@ -1,14 +1,12 @@
-import * as ts from "typescript";
-import { SourceFile } from "typescript";
-import * as fs from "fs";
-import * as path from "path";
-import { FunctionDescription } from "./models/functionDescription";
-import { FunctionType } from "./models/functionType";
-import { JSONSchema, Token, TokenStream } from "./models/jsonSchema";
+import * as ts from 'typescript';
+import { SourceFile } from 'typescript';
+import * as fs from 'fs';
+import * as path from 'path';
+import { FunctionDescription } from './models/functionDescription';
+import { FunctionType } from './models/functionType';
+import { JSONSchema, Token, TokenStream } from './models/jsonSchema';
 
 class PatchFunctionCompiler {
-
-
   private readonly sourceFiles: ReadonlyArray<ts.SourceFile>;
   private typeChecker: ts.TypeChecker;
   private typeDefinitions: Record<string, string> = {};
@@ -40,7 +38,6 @@ class PatchFunctionCompiler {
     });
 
     patchFunctions.forEach(pf => {
-
       const inputTypeDefinitionTokenStream = this.tokenizeTypeScriptType(
         <string>pf.inputTypeDefinition
       );
@@ -58,7 +55,6 @@ class PatchFunctionCompiler {
         pf.name,
         outputTypeDefinitionTokenStream
       );
-
     });
 
     this.writeToJSON(patchFunctions);
@@ -116,7 +112,7 @@ class PatchFunctionCompiler {
         const itemType = token.substring(0, token.length - 2).trim();
         return {
           type: 'array',
-          items: { type: itemType }
+          items: { type: itemType },
         };
       }
 
@@ -128,22 +124,27 @@ class PatchFunctionCompiler {
         if (types.includes('Date')) {
           return types.length === 1
             ? { type: 'string', format: 'date-time' }
-            : { oneOf: types.map(t => t === 'Date' ? { type: 'string', format: 'date-time' } : { type: t }) };
+            : {
+                oneOf: types.map(t =>
+                  t === 'Date'
+                    ? { type: 'string', format: 'date-time' }
+                    : { type: t }
+                ),
+              };
         }
         return {
           type: 'string',
-          enum: types
+          enum: types,
         };
       } else if (token.includes('&')) {
         const types = token.split('&').map(s => s.trim().replace(/"/g, ''));
         return { allOf: types.map(t => ({ type: t })) };
-
       } else if (token.trim() === 'any') {
         return {};
       } else if (token.trim().startsWith('Record')) {
         return {
           type: 'object',
-          additionalProperties: true
+          additionalProperties: true,
         };
       } else if (token.trim() === 'Date') {
         return { type: 'string', format: 'date-time' };
@@ -152,10 +153,9 @@ class PatchFunctionCompiler {
       }
     }
 
-
     const schema = parseObject();
     schema.$id = name;
-    schema.$schema = "http://json-schema.org/draft-07/schema#";
+    schema.$schema = 'http://json-schema.org/draft-07/schema#';
 
     return schema;
   }
@@ -212,7 +212,7 @@ class PatchFunctionCompiler {
       node.initializer &&
       ts.isTaggedTemplateExpression(node.initializer)
     ) {
-      console.log('Found tagged template expression');
+      //console.log('Found tagged template expression');
 
       const name = functionName; // Use the passed function name
       const docstringWithTicks = node.initializer.template.getText();
@@ -220,7 +220,7 @@ class PatchFunctionCompiler {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       const typeArguments: any[] = (node.initializer.tag as any).typeArguments;
       if (typeArguments && typeArguments.length === 2) {
-        console.log('Found type arguments');
+        //console.log('Found type arguments');
 
         const outputTypeNode: ts.Node = typeArguments[0];
         const inputTypeNode: ts.Node = typeArguments[1];
@@ -231,7 +231,9 @@ class PatchFunctionCompiler {
         const inputTypeDefinition = this.extractTypeDefinition(inputType);
         const outputTypeDefinition = this.extractTypeDefinition(outputType);
 
-        const type = (!outputTypeDefinition.startsWith('Embedding')) ? FunctionType.SYMBOLIC : FunctionType.EMBEDDABLE
+        const type = !outputTypeDefinition.startsWith('Embedding')
+          ? FunctionType.SYMBOLIC
+          : FunctionType.EMBEDDABLE;
 
         return new FunctionDescription(
           name,

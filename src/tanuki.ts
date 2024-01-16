@@ -11,15 +11,10 @@ import { Validator } from './validator';
 import { PatchConfig } from './models/patchConfig';
 import { FunctionDescription } from './models/functionDescription';
 import FunctionModeler from './functionModeler';
-import * as dotenv from "dotenv";
-import { FunctionType } from "./models/functionType";
+import * as dotenv from 'dotenv';
+import { FunctionType } from './models/functionType';
+import fs from 'fs';
 dotenv.config();
-
-const ALIGN_LEVEL_NUM = 15;
-const PATCH_LEVEL_NUM = 14;
-const ALIGN_FILE_NAME = '.align';
-
-const alignable_functions = {};
 
 type ExpectFunctionType = (actual: any) => {
   toMatchObject: (expected: any) => void;
@@ -29,7 +24,10 @@ type ExpectFunctionType = (actual: any) => {
   // Add other methods as necessary
 };
 // Type for the 'it' function
-type ItFunctionType = (description: string, testFn: (expect: ExpectFunctionType) => void) => void;
+type ItFunctionType = (
+  description: string,
+  testFn: (expect: ExpectFunctionType) => void
+) => void;
 
 // Set up basic configuration
 const logger: IDatasetWorker = new FilesystemBufferedLogger();
@@ -51,26 +49,31 @@ const embeddingModeler = new EmbeddingModelManager(
 //const telemetryEnabled: boolean = true
 const validator = new Validator();
 
-type MockResponseType = { functionDescription: FunctionDescription; input: any };
+type MockResponseType = {
+  functionDescription: FunctionDescription;
+  input: any;
+};
 
 function isMockResponseType(obj: any): obj is MockResponseType {
   // Check for existence and type of each property
   // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-  return obj &&
+  return (
+    obj &&
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     typeof obj.functionDescription !== 'undefined' && // Add more specific checks if needed
-    'input' in obj; // Checks for the existence of the 'input' property
+    'input' in obj
+  ); // Checks for the existence of the 'input' property
 }
 
 export class Tanuki {
-
   private static isAlignActive = false;
   constructor() {
     // eslint-disable-next-line @typescript-eslint/unbound-method
     const configPath = ts.findConfigFile(
       './',
       // eslint-disable-next-line @typescript-eslint/unbound-method
-      ts.sys.fileExists,
+      fs.existsSync,
+      //ts.sys.fileExists,
       'tsconfig.json'
     );
     if (!configPath) {
@@ -83,7 +86,6 @@ export class Tanuki {
       ts.sys,
       path.dirname(configPath)
     );
-
     // Create a TypeScript program with the parsed configuration
     const program = ts.createProgram(
       parsedConfig.fileNames,
@@ -105,18 +107,24 @@ export class Tanuki {
       if (!Tanuki.isAlignActive) {
         throw new Error('it() can only be called within an align block.');
       }
-      function handleAlignStatement({ actual, expected, equal }: {
-        actual: { functionDescription: FunctionDescription, input: any },
-        expected: any,
-        equal: boolean
+      function handleAlignStatement({
+        actual,
+        expected,
+        equal,
+      }: {
+        actual: { functionDescription: FunctionDescription; input: any };
+        expected: any;
+        equal: boolean;
       }) {
-        const functionDescription = actual.functionDescription as unknown as FunctionDescription
-        const input = actual.input
+        const functionDescription =
+          actual.functionDescription as unknown as FunctionDescription;
+        const input = actual.input;
         if (functionDescription.type === FunctionType.SYMBOLIC) {
-          functionModeler.saveSymbolicAlignStatements(functionDescription.hash(),
+          functionModeler.saveSymbolicAlignStatements(
+            functionDescription.hash(),
             input,
             expected
-          )
+          );
         } else {
           if (isMockResponseType(expected)) {
             //expected
@@ -125,33 +133,48 @@ export class Tanuki {
                 functionDescription.hash(),
                 input,
                 [expected.input],
-                [],
-              )
+                []
+              );
             } else {
               functionModeler.saveEmbeddableAlignStatements(
                 functionDescription.hash(),
                 input,
                 [],
-                [expected.input],
-              )
+                [expected.input]
+              );
             }
           }
         }
-        console.log(`Expecting: `, actual, `to equal: `, expected);
       }
-      const expect: ExpectFunctionType = (actual) => ({
-        toMatchObject: (expected) => {
-          handleAlignStatement({ actual: actual, expected: expected, equal: true })
+      const expect: ExpectFunctionType = actual => ({
+        toMatchObject: async expected => {
+          handleAlignStatement({
+            actual: await actual,
+            expected: expected,
+            equal: true,
+          });
         },
-        toEqual: (expected) => {
-          handleAlignStatement({ actual: actual, expected: expected, equal: true })
+        toEqual: async expected => {
+          handleAlignStatement({
+            actual: await actual,
+            expected: expected,
+            equal: true,
+          });
         },
-        toBe: (expected) => {
-          handleAlignStatement({ actual: actual, expected: expected, equal: true })
+        toBe: async expected => {
+          handleAlignStatement({
+            actual: await actual,
+            expected: expected,
+            equal: true,
+          });
         },
-        notEqual: (expected) => {
-          handleAlignStatement({ actual: actual, expected: expected, equal: false })
-        }
+        notEqual: async expected => {
+          handleAlignStatement({
+            actual: await actual,
+            expected: expected,
+            equal: false,
+          });
+        },
       });
 
       testFn(expect);
@@ -160,28 +183,33 @@ export class Tanuki {
     testSuite(it);
     Tanuki.isAlignActive = false;
   }
-
 }
-
 
 export function patch<OutputType, InputType>(config?: PatchConfig) {
   return (strings: TemplateStringsArray, ...expressions: any[]) => {
     // Extract the prompt (instruction) from the template literal
     const docstring = strings.join('');
 
+    if (config?.environmentId) {
+      FunctionModeler.environmentId = config?.environmentId;
+    }
+
     // Return a function that takes an input of type InputType and returns a value of type OutputType
-    return (input: InputType): OutputType => {
+    return async (input: InputType): Promise<OutputType> => {
       const functionName: string = getCallerInfo();
       const functionDescription: FunctionDescription =
         Register.loadFunctionDescription(functionName, docstring);
 
+      if (config) {
+        FunctionModeler.setConfig(functionDescription.hash(), config);
+      }
+
       // Alter behavior if within tanuki.align
       if (Tanuki.isWithinAlign()) {
-
         // This is a total hack. We need to figure out a better way to do this rather than abusing the type system.
         return {
           functionDescription,
-          input
+          input,
         } as unknown as OutputType;
       }
 
@@ -189,17 +217,17 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
         functionDescription.outputTypeDefinition == 'Embedding' ||
         /^Embedding<.*>$/.test(<string>functionDescription.outputTypeDefinition)
       ) {
-        return embeddingModeler.call(
+        return (await embeddingModeler.call(
           input,
           functionDescription,
           validator
-        ) as unknown as OutputType;
+        )) as unknown as OutputType;
       } else {
-        return languageModeler.call(
+        return (await languageModeler.call(
           input,
           functionDescription,
           validator
-        ) as unknown as OutputType;
+        )) as unknown as OutputType;
       }
     };
   };

@@ -1,16 +1,18 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'fs';
+import * as fs from 'fs';
+//import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import IBloomFilterPersistence from '../persistence/iBloomFilterPersistence';
 import BloomFilterFileSystemDriver from '../persistence/bloomFilterFileSystemDriver';
 import AbstractBufferedLogger from './abstractBufferedLogger';
-import { userDataDir } from "../utils";
+import { userDataDir } from '../utils';
 import {
-  ALIGN_FILE_EXTENSION, NEGATIVE_EMBEDDABLE_ALIGNMENTS,
+  ALIGN_FILE_EXTENSION, LIB_NAME, NEGATIVE_EMBEDDABLE_ALIGNMENTS,
   NEGATIVE_FILE_EXTENSION,
   PATCH_FILE_EXTENSION, PATCHES, POSITIVE_EMBEDDABLE_ALIGNMENTS,
   POSITIVE_FILE_EXTENSION, SYMBOLIC_ALIGNMENTS
 } from "../constants";
-const path = require('path');
+//const path = require('path');
+import * as path from 'path';
 export class FilesystemBufferedLogger extends AbstractBufferedLogger {
   private logDirectory: string;
 
@@ -33,34 +35,34 @@ export class FilesystemBufferedLogger extends AbstractBufferedLogger {
   }
 
   ensurePersistenceLocationExists(): void {
-    if (!existsSync(this.logDirectory)) {
-      mkdirSync(this.logDirectory, { recursive: true });
+    if (!fs.existsSync(this.logDirectory)) {
+      fs.mkdirSync(this.logDirectory, { recursive: true });
     }
   }
 
   doesObjectExist(path: string): boolean {
-    return existsSync(path);
+    return fs.existsSync(path);
   }
 
-  private getLogDirectory(): string {
+  public getLogDirectory(): string {
     const filename = 'functions';
 
     // If explicitly defined
     const envDir = process.env.ENVVAR;
-    if (envDir && existsSync(envDir)) {
+    if (envDir && fs.existsSync(envDir)) {
       return join(envDir, filename);
     }
 
     // If installed as a library, use the user's data directory
-    const libraryDir = join(userDataDir('LIB_NAME'), filename); // Replace 'LIB_NAME' with actual library name
-    if (existsSync(libraryDir) || !existsSync(libraryDir)) {
+    const libraryDir = join(userDataDir(LIB_NAME), filename);
+    if (fs.existsSync(libraryDir) || !fs.existsSync(libraryDir)) {
       return libraryDir;
     }
 
     // Try to find the git root
     let currentDir = process.cwd();
     while (currentDir !== '/') {
-      if (readdirSync(currentDir).includes('.git')) {
+      if (fs.readdirSync(currentDir).includes('.git')) {
         return join(currentDir, filename);
       }
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
@@ -83,14 +85,14 @@ export class FilesystemBufferedLogger extends AbstractBufferedLogger {
     };
 
     const logFilePath = join(this.logDirectory, funcHash + datasetTypeMap[datasetType]);
-    if (!existsSync(logFilePath)) {
+    if (!fs.existsSync(logFilePath)) {
       if (returnType === 'both') return [0, null];
       if (returnType === 'dataset') return null;
       return 0;
     }
 
     try {
-      const dataset = readFileSync(logFilePath, 'utf-8');
+      const dataset = fs.readFileSync(logFilePath, 'utf-8');
       const datasetLength = dataset.split('\n').length;
       return returnType === 'both' ? [datasetLength, dataset] : (returnType === 'dataset' ? dataset : datasetLength);
     } catch (e) {
@@ -105,11 +107,11 @@ export class FilesystemBufferedLogger extends AbstractBufferedLogger {
     datasetLengths[NEGATIVE_EMBEDDABLE_ALIGNMENTS] = {};
     datasetLengths[PATCHES] = {};
 
-    if (!existsSync(this.logDirectory)) {
-      mkdirSync(this.logDirectory, { recursive: true });
+    if (!fs.existsSync(this.logDirectory)) {
+      fs.mkdirSync(this.logDirectory, { recursive: true });
     }
 
-    const files = readdirSync(this.logDirectory).filter(file => !file.endsWith('.json'));
+    const files = fs.readdirSync(this.logDirectory).filter(file => !file.endsWith('.json'));
 
     for (const file of files) {
       const datasetType = file.includes(ALIGN_FILE_EXTENSION) ? SYMBOLIC_ALIGNMENTS :
@@ -132,11 +134,11 @@ export class FilesystemBufferedLogger extends AbstractBufferedLogger {
   }
 
   write(path: string, data: string, mode: 'w' | 'a' | 'a+b' | 'a+' = 'w'): void {
-    writeFileSync(path, data, { flag: mode });
+    fs.writeFileSync(path, data, { flag: mode });
   }
 
   read(path: string): string {
-    return readFileSync(path, 'utf-8');
+    return fs.readFileSync(path, 'utf-8');
   }
 
   getHashFromPath(path: string): string {

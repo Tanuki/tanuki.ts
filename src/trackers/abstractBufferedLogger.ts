@@ -29,7 +29,7 @@ abstract class AbstractBufferedLogger implements IDatasetWorker {
   private bufferRollingSize: Record<string, number>;
   private writeCount: number;
   private writeLimit: number;
-  protected bloomFilter!: BloomFilter;
+  bloomFilter!: BloomFilter;
 
   // Default configuration for FunctionConfig
   defaultFunctionConfig: FunctionConfig = {

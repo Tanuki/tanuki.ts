@@ -4,7 +4,7 @@ import IBloomFilterPersistence from './persistence/iBloomFilterPersistence';
 class BloomFilter {
   private size: number;
   private hashCount: number;
-  private bitArray: boolean[];
+  bitArray: boolean[];
   private persistence: IBloomFilterPersistence;
 
   constructor(
