@@ -4,16 +4,22 @@ import { Embedding } from '../models/embedding';
 import { FinetuneJob } from '../models/finetuneJob';
 
 import axios from 'redaxios';
-import { CreateEmbeddingResponse } from 'openai/resources';
+import { CreateEmbeddingResponse, FineTuning } from "openai/resources";
 import { Readable } from 'stream';
+import { OpenAIConfig } from "./llmConfigs/openAIConfig";
+import { DEFAULT_DISTILLED_MODEL_NAME, DEFAULT_GENERATIVE_MODELS } from "../constants";
+import { BaseModelConfig } from "./llmConfigs/baseModelConfig";
+import FineTuningJob = FineTuning.FineTuningJob;
+
+const LLM_GENERATION_PARAMETERS: string[] = ["temperature", "top_p", "max_new_tokens", "frequency_penalty", "presence_penalty"]
 
 interface FineTuningJobResponse {
   id: string;
   status: string;
-  fine_tuned_model?: string | null;
+  fineTunedModel?: BaseModelConfig | string |null;
 }
 
-export class OpenAIApi {
+export class OpenAIAPI {
   private apiKey: string;
   private client: OpenAI;
   private readonly openaiUrl: string =
@@ -27,11 +33,11 @@ export class OpenAIApi {
     this.client = new OpenAI({ apiKey: this.apiKey });
   }
 
-  public async embed(texts: string[], model = 'text-similarity-babbage-001', kwargs: any = {}): Promise<Embedding<number>[]> {
+  public async embed(texts: string[], model: OpenAIConfig, kwargs: any = {}): Promise<Embedding<number>[]> {
     try {
       const response: CreateEmbeddingResponse = await this.client.embeddings.create({
           input: texts,
-          model: model,
+          model: model.modelName,
           ...kwargs,
         });
 
@@ -51,6 +57,15 @@ export class OpenAIApi {
     }
   }
 
+  /**
+   * The main generation function, given the args, kwargs, functionModeler, function description and model type, generate a response and check if the datapoint can be saved to the finetune dataset
+   * The main generation function, given the args, kwargs, functionModeler, function description and model type, generate a response
+   * @param model (OpenAIConfig): The model to use for generation.
+   * @param systemMessage (str): The system message to use for generation.
+   * @param prompt (str): The prompt to use for generation.
+   * @param kwargs (dict): Additional generation parameters.
+   * @param maxRetries
+   */
   public async generate(
     model: string,
     systemMessage: string,
@@ -64,7 +79,7 @@ export class OpenAIApi {
     maxRetries = 5 // Define the maximum number of retries
   ): Promise<string> {
     const {
-      temperature = 0,
+      temperature = 0.1,
       topP = 1,
       frequencyPenalty = 0,
       presencePenalty = 0
@@ -110,8 +125,7 @@ export class OpenAIApi {
     try {
       const response = await this.client.fineTuning.jobs.list({ limit });
       return response.data.map((job: FineTuningJobResponse) => {
-        const fineTunedModel = job.fine_tuned_model ?? 'Not Available'; // Handle null case
-        return new FinetuneJob(job.id, job.status, fineTunedModel);
+        return this.createFinetuneJob(job);
       });
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -121,21 +135,21 @@ export class OpenAIApi {
 
   public async getFinetuned(jobId: string): Promise<FinetuneJob> {
     this.checkApiKey();
-    try {
-      const response = await axios.get(`${this.openaiUrl}/fine-tuning/jobs/${jobId}`, {
+    const response = await this.client.fineTuning.jobs.retrieve(jobId);
+      /*const response = await axios.get(`${this.openaiUrl}/fine-tuning/jobs/${jobId}`, {
           headers: {
             Authorization: `Bearer ${this.apiKey}`,
           },
         }
-      );
+      );*/
+    const job = this.createFinetuneJob(response);
+    return job;
+  }
+  private createFinetuneJob(response: FineTuningJobResponse): FinetuneJob {
+    const modelConfig = JSON.parse(JSON.stringify(DEFAULT_GENERATIVE_MODELS[DEFAULT_DISTILLED_MODEL_NAME]));
+    modelConfig.model_name = response.fineTunedModel ?? 'Not Available'; // Handle null case
 
-      const data: FineTuningJobResponse = response.data;
-
-      return new FinetuneJob(data.id, data.status, data.fine_tuned_model ?? '')
-    } catch (error: any) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to retrieve fine-tuned job: ${errorMessage}`);
-    }
+    return new FinetuneJob(response.id, response.status, modelConfig);
   }
 
   public async finetune(
@@ -154,17 +168,16 @@ export class OpenAIApi {
       });
 
       // Start fine-tuning
-      const finetuningResponse = await this.client.fineTuning.jobs.create({
+      const finetuningResponse: FineTuningJob = await this.client.fineTuning.jobs.create({
         training_file: fileUploadResponse.id,
         model: 'gpt-3.5-turbo',
         suffix: suffix
       });
 
-      return new FinetuneJob(
-        finetuningResponse.id,
-        finetuningResponse.status,
-        finetuningResponse.fine_tuned_model || ''
-      );
+      const finetunedModelConfig = JSON.parse(JSON.stringify(DEFAULT_GENERATIVE_MODELS[DEFAULT_DISTILLED_MODEL_NAME]));
+      finetunedModelConfig.model_name = finetuningResponse.fine_tuned_model ?? 'Not Available'; // Handle null case
+
+      return new FinetuneJob(finetuningResponse.id, finetuningResponse.status, finetunedModelConfig);
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to create fine-tuning job: ${errorMessage}`);

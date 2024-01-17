@@ -1,5 +1,7 @@
+import { BaseModelConfig } from "../languageModels/llmConfigs/baseModelConfig";
+
 export interface FunctionConfig {
-  distilledModel: string;
+  distilledModel: BaseModelConfig;
   currentModelStats: {
     trainedOnDatapoints: number;
     runningFaults: number[];
@@ -14,7 +16,7 @@ export interface FunctionConfig {
     trainedOnDatapoints?: number;
     lastChecked?: string;
   };
-  teacherModels: string[];
+  teacherModels: BaseModelConfig[];
   nrOfTrainingRuns: number;
   currentModel?: string;
 }

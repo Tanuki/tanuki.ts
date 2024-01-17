@@ -1,6 +1,9 @@
 import { homedir } from 'os';
 import { join } from 'path';
 
+function _notImplemented() : never {
+  throw new Error("not Implemented")
+}
 function approximateTokenCount(content: string): number {
   const commonSpecialCharacters = "\\/(){}[]<>|`~@#$%^&*+=-_:;\"";
   const numberOfWordTokens = Math.ceil(content.split(" ").length * 1.333);

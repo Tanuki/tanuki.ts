@@ -3,7 +3,7 @@ import * as path from 'path';
 import PatchFunctionCompiler from './patchFunctionCompiler';
 import { IDatasetWorker } from './trackers/IDatasetWorker';
 import FilesystemBufferedLogger from './trackers/filesystemBufferedLogger';
-import { OpenAIApi } from './languageModels/openAIApi';
+import { OpenAIAPI } from './languageModels/openAIAPI';
 import { Register } from './register';
 import { LanguageModelManager } from './languageModels/languageModelManager';
 import EmbeddingModelManager from './languageModels/embeddingModelManager';
@@ -14,6 +14,7 @@ import FunctionModeler from './functionModeler';
 import * as dotenv from 'dotenv';
 import { FunctionType } from './models/functionType';
 import fs from 'fs';
+import { APIManager } from "./APIManager";
 dotenv.config();
 
 type ExpectFunctionType = (actual: any) => {
@@ -32,19 +33,19 @@ type ItFunctionType = (
 // Set up basic configuration
 const logger: IDatasetWorker = new FilesystemBufferedLogger();
 
-const APIProviders = { openai: new OpenAIApi() };
+const apiManager= new APIManager();
 // currently only use buffered logger as default
-const functionModeler = new FunctionModeler(logger, APIProviders);
+const functionModeler = new FunctionModeler(logger, apiManager);
 Register.loadFunctions();
 
 const languageModeler = new LanguageModelManager(
   functionModeler,
   512,
-  APIProviders
+  apiManager
 );
 const embeddingModeler = new EmbeddingModelManager(
   functionModeler,
-  APIProviders
+  apiManager
 );
 //const telemetryEnabled: boolean = true
 const validator = new Validator();
@@ -196,12 +197,15 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
 
     // Return a function that takes an input of type InputType and returns a value of type OutputType
     return async (input: InputType): Promise<OutputType> => {
-      const functionName: string = getCallerInfo();
-      const functionDescription: FunctionDescription =
-        Register.loadFunctionDescription(functionName, docstring);
+      const functionName: string = getCallerInfo(Register.getNamedFunctions());
+      const functionDescription: FunctionDescription = Register.loadFunctionDescription(functionName, docstring);
 
       if (config) {
         FunctionModeler.setConfig(functionDescription.hash(), config);
+      }
+
+      if (config && config.teacherModels && config?.teacherModels?.length > 0) {
+        FunctionModeler.configureTeacherModels(config.teacherModels, functionDescription.hash(), functionDescription.type);
       }
 
       // Alter behavior if within tanuki.align
@@ -233,7 +237,8 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
   };
 }
 
-export function getCallerInfo(): string {
+/*
+export function getCallerInfo(availableFunctionNames: string[]): string {
   try {
     // Throw an error and catch it to access the stack trace
     throw new Error();
@@ -251,4 +256,29 @@ export function getCallerInfo(): string {
     }
   }
   return '';
+}*/
+export function getCallerInfo(availableFunctionNames: string[]): string {
+  try {
+    // Throw an error and catch it to access the stack trace
+    throw new Error();
+  } catch (error) {
+    if (error instanceof Error && error.stack) {
+      const stackLines = error.stack.split('\n');
+
+      // Iterate through stack lines and match with available function names
+      for (const line of stackLines) {
+        // Use a regular expression to extract a potential function name
+        const match = /at\s+([^\s]+)\s+/.exec(line);
+        if (match && match[1]) {
+          // Check if extracted name is in the list of available function names
+          const functionName = match[1].split('.').pop(); // Extracting function name
+          if (functionName && availableFunctionNames.includes(functionName)) {
+            return functionName; // Returns the matched function name
+          }
+        }
+      }
+    }
+  }
+  return '';
 }
+

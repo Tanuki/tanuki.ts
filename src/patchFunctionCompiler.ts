@@ -1,5 +1,4 @@
-import * as ts from 'typescript';
-import { SourceFile } from 'typescript';
+import ts, { SourceFile } from 'typescript';
 import * as fs from 'fs';
 import * as path from 'path';
 import { FunctionDescription } from './models/functionDescription';

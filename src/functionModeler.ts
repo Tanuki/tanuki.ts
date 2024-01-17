@@ -1,13 +1,21 @@
 import { FinetuneJob } from './models/finetuneJob';
-import LLMFinetuneAPI from './languageModels/LLMFinetuneAPI';
 import { FunctionExample } from './models/functionExample';
 import { IDatasetWorker } from './trackers/IDatasetWorker';
 import { approximateTokenCount, decodeInt, encodeInt } from './utils';
 import { FunctionDescription } from './models/functionDescription';
 import { PatchConfig } from './models/patchConfig';
 import { FunctionConfig } from './models/functionConfig';
-import { EXAMPLE_ELEMENT_LIMIT } from './constants';
+import {
+  DEFAULT_DISTILLED_MODEL_NAME,
+  DEFAULT_EMBEDDING_MODELS,
+  DEFAULT_GENERATIVE_MODELS,
+  EXAMPLE_ELEMENT_LIMIT,
+  OPENAI_PROVIDER, PATCHES, SYMBOLIC_ALIGNMENTS
+} from "./constants";
 import functionModeler from "./functionModeler";
+import { APIManager } from "./APIManager";
+import { BaseModelConfig } from "./languageModels/llmConfigs/baseModelConfig";
+import { FunctionType } from "./models/functionType";
 // Define an interface for the expected structure of FunctionExample data
 interface FunctionExampleData {
   args: any[];
@@ -21,17 +29,19 @@ export class FunctionModeler {
   public static checkFinetuneBlacklist: Set<string>;
   public static executeFinetuneBlacklist: Set<string>;
   public static storeDataBlacklist: Set<string>;
+  static teacherModelsOverride: Record<string, BaseModelConfig[]>
+
   private functionConfigs: Record<string, FunctionConfig>;
   private dataWorker: IDatasetWorker;
   private symbolicAlignBuffer: Record<string, any>;
   private embeddableAlignBuffer: Record<string, any>;
   private datasetSizes: Record<string, Record<string, number>>;
-  private apiProviders: Record<string, LLMFinetuneAPI>;
+  private apiManager: APIManager;
+
 
   constructor(
     dataWorker: IDatasetWorker,
-    apiProviders: Record<string, LLMFinetuneAPI> = {},
-    //environmentId = 0
+    apiManager: APIManager
   ) {
     this.functionConfigs = {};
     this.dataWorker = dataWorker;
@@ -39,21 +49,55 @@ export class FunctionModeler {
     this.symbolicAlignBuffer = {};
     this.embeddableAlignBuffer = {};
     this.datasetSizes = this.getDatasets();
+    FunctionModeler.teacherModelsOverride = {};
     //FunctionModeler.environmentId = environmentId;
     FunctionModeler.checkFinetuneBlacklist = new Set<string>();
     FunctionModeler.executeFinetuneBlacklist = new Set<string>();
     FunctionModeler.storeDataBlacklist = new Set<string>();
+
     this.datasetSizes = {
       POSITIVE_EMBEDDABLE_ALIGNMENTS: {},
       NEGATIVE_EMBEDDABLE_ALIGNMENTS: {},
       SYMBOLIC_ALIGNMENTS: {},
       PATCHES: {},
     };
+
     this.symbolicAlignBuffer = {};
     this.embeddableAlignBuffer = {};
-    this.apiProviders = apiProviders;
+    this.apiManager = apiManager;
   }
 
+  static configureTeacherModels(teacherModels: (string | BaseModelConfig)[], funcHash: string, taskType: FunctionType): void {
+    if (!(funcHash in this.teacherModelsOverride)) {
+      this.teacherModelsOverride[funcHash] = [];
+    }
+
+    let preconfiguredModels = taskType === FunctionType.EMBEDDABLE ? DEFAULT_EMBEDDING_MODELS : DEFAULT_GENERATIVE_MODELS;
+    teacherModels.forEach(model => {
+      let modelConfig: BaseModelConfig;
+
+      if (typeof model === 'string') {
+        if (!(model in preconfiguredModels)) {
+          throw new Error(`Teacher model ${model} not supported by default. Please include it in the list in extended config format`);
+        }
+        // @ts-ignore
+        modelConfig = preconfiguredModels[model];
+      } else {
+        modelConfig = model;
+      }
+
+      this.teacherModelsOverride[funcHash].push(modelConfig);
+
+      if (modelConfig.provider !== OPENAI_PROVIDER) {
+        if (!FunctionModeler.checkFinetuneBlacklist.has(funcHash)) {
+          FunctionModeler.checkFinetuneBlacklist.add(funcHash);
+        }
+        if (!FunctionModeler.executeFinetuneBlacklist.has(funcHash)) {
+          FunctionModeler.executeFinetuneBlacklist.add(funcHash);
+        }
+      }
+    });
+  }
   public static setConfig(functionHash: string, config: PatchConfig) {
     functionModeler.environmentId = config.environmentId ?? 0;
 
@@ -312,14 +356,17 @@ export class FunctionModeler {
     }
   }
 
+
   async loadFunctionConfig(
     funcHash: string,
     functionDescription: FunctionDescription
   ): Promise<FunctionConfig> {
-    const [config, defaultUsed] = this.dataWorker.loadFunctionConfig(funcHash);
+    const [config, defaultUsed] = this.dataWorker.loadFunctionConfig(funcHash)
+    const finetuneProvider: string = config.distilledModel.provider
     if (defaultUsed && !functionModeler.checkFinetuneBlacklist.has(funcHash)) {
       const [finetuned, finetuneConfig] = await this.checkForFinetunes(
-        functionDescription
+        functionDescription,
+        finetuneProvider
       );
       if (finetuned) {
         this.functionConfigs[funcHash] = finetuneConfig;
@@ -331,20 +378,21 @@ export class FunctionModeler {
   }
 
   private async checkForFinetunes(
-    functionDescription: FunctionDescription
+    functionDescription: FunctionDescription,
+    finetuneProvider: string
   ): Promise<[boolean, FunctionConfig]> {
     const finetuneHash =
       functionDescription.hash('finetune') + encodeInt(functionModeler.environmentId);
-    const finetunes: FinetuneJob[] = await this.apiProviders[
+    const finetunes: FinetuneJob[] = await (await this.apiManager.getProvider(
       'openai'
-    ].listFinetuned(1000);
+    )).listFinetuned(1000);
 
     for (const finetune of finetunes) {
       if (finetune.status === 'succeeded') {
         if (finetune.fineTunedModel === undefined) {
           throw new Error('Finetuned model is empty');
         }
-        if (finetune.fineTunedModel.includes(finetuneHash)) {
+        if (finetune.fineTunedModel.modelName.includes(finetuneHash)) {
           try {
             const config = this.constructConfigFromFinetune(
               finetuneHash,
@@ -360,14 +408,14 @@ export class FunctionModeler {
             return [
               false,
               {
-                distilledModel: '',
+                distilledModel: DEFAULT_GENERATIVE_MODELS[DEFAULT_DISTILLED_MODEL_NAME],
                 currentModelStats: {
                   trainedOnDatapoints: 0,
                   runningFaults: [],
                 },
                 lastTrainingRun: { trainedOnDatapoints: 0 },
                 currentTrainingRun: {},
-                teacherModels: ['gpt-4', 'gpt-4-32k'],
+                teacherModels: [],
                 nrOfTrainingRuns: 0,
               },
             ];
@@ -379,11 +427,11 @@ export class FunctionModeler {
     return [
       false,
       {
-        distilledModel: '',
+        distilledModel: DEFAULT_GENERATIVE_MODELS[DEFAULT_DISTILLED_MODEL_NAME],
         currentModelStats: { trainedOnDatapoints: 0, runningFaults: [] },
         lastTrainingRun: { trainedOnDatapoints: 0 },
         currentTrainingRun: {},
-        teacherModels: ['gpt-4', 'gpt-4-32k'],
+        teacherModels: [],
         nrOfTrainingRuns: 0,
       },
     ];
@@ -393,14 +441,9 @@ export class FunctionModeler {
     finetuneHash: string,
     finetune: FinetuneJob
   ): FunctionConfig {
-    const model = finetune.fineTunedModel || '';
-
-    if (model === '') {
-      throw new Error('Finetuned model is empty');
-    }
-
-    const finetuneHashEnd = model.indexOf(finetuneHash) + finetuneHash.length;
-    const nextChar = model.charAt(finetuneHashEnd);
+    const model = finetune.fineTunedModel
+    const finetuneHashEnd = model.modelName.indexOf(finetuneHash) + finetuneHash.length;
+    const nextChar = model.modelName.charAt(finetuneHashEnd);
     const nrOfTrainingRuns = decodeInt(nextChar) + 1;
     const nrOfTrainingPoints = Math.pow(2, nrOfTrainingRuns - 1) * 200;
 
@@ -412,14 +455,14 @@ export class FunctionModeler {
       },
       lastTrainingRun: { trainedOnDatapoints: nrOfTrainingPoints },
       currentTrainingRun: {},
-      teacherModels: ['gpt-4', 'gpt-4-32k'],
+      teacherModels: [],
       nrOfTrainingRuns: nrOfTrainingRuns,
     };
   }
 
   async getModels(
     functionDescription: FunctionDescription
-  ): Promise<[string, string[]]> {
+  ): Promise<[BaseModelConfig, BaseModelConfig[]]> {
     const funcHash = functionDescription.hash();
     let funcConfig: FunctionConfig;
 
@@ -428,20 +471,18 @@ export class FunctionModeler {
     } else {
       funcConfig = await this.loadFunctionConfig(funcHash, functionDescription);
     }
-
-    let distilledModel = '';
-    if (funcConfig.distilledModel) {
-      distilledModel = funcConfig.distilledModel;
-    } else if (
-      funcConfig.currentModel &&
-      !funcConfig.teacherModels.includes(funcConfig.currentModel)
-    ) {
-      distilledModel = funcConfig.currentModel;
-    }
-
-    return [distilledModel, funcConfig.teacherModels];
+    return [funcConfig.distilledModel, funcConfig.teacherModels];
   }
 
+  /**
+   * Update the config to reflect the new datapoint in the training data
+   * First adds 1 to the current datapoints
+   * Then updates running faults depending if priority is True or not and takes last 100
+   * Then checks the revert condition, i.e if last 10 datapoints are 50% faulty
+   * Finally updates the config file
+   * @param repaired
+   * @param funcHash
+   */
   updateDatapointConfig(repaired: boolean, funcHash: string): void {
     try {
       const faultValue = repaired ? 1 : 0;
@@ -453,7 +494,7 @@ export class FunctionModeler {
         runningFaults.slice(-100);
 
       if (runningFaults.slice(-10).reduce((a, b) => a + b, 0) / 10 > 0.5) {
-        this.functionConfigs[funcHash].distilledModel = '';
+        this.functionConfigs[funcHash].distilledModel.modelName = '';
         this.functionConfigs[
           funcHash
         ].currentModelStats.trainedOnDatapoints = 0;
@@ -513,6 +554,14 @@ export class FunctionModeler {
     return patchDatasetSize + alignDatasetSize > trainingThreshold;
   }
 
+  /**
+   * Execute the finetuning
+   * First create the OpenAI compatible dataset with jsonL file and upload it
+   * Then submit the OpenAI finetuning job
+   * Finally update the config file to reflect the new finetuning job as current
+   * @param functionDescription
+   * @param funcHash
+   */
   async executeFinetuning(
     functionDescription: FunctionDescription,
     funcHash: string
@@ -527,12 +576,12 @@ export class FunctionModeler {
     const functionString = JSON.stringify(functionDescription);
 
     const alignDataset: string = this.getDatasetInfo(
-      'SYMBOLIC_ALIGNMENTS',
+      SYMBOLIC_ALIGNMENTS,
       funcHash,
       'dataset'
     ) as string;
     const patchDataset: string = this.getDatasetInfo(
-      'PATCHES',
+      PATCHES,
       funcHash,
       'dataset'
     ) as string;
@@ -576,18 +625,29 @@ export class FunctionModeler {
       .join('\n');
 
     // Create the finetune hash
-    const finetuneHash =
+    let finetuneHash =
       functionDescription.hash('finetune') +
       encodeInt(functionModeler.environmentId) +
       encodeInt(this.functionConfigs[funcHash].nrOfTrainingRuns);
 
+    const nrOfTrainingRuns = this.functionConfigs[funcHash].nrOfTrainingRuns;
+    finetuneHash += encodeInt(FunctionModeler.environmentId);
+    finetuneHash += encodeInt(nrOfTrainingRuns);
+
+    const alignDatasetSize = this.datasetSizes.SYMBOLIC_ALIGNMENTS[funcHash] || 0;
+    const patchDatasetSize = this.datasetSizes.PATCHES[funcHash] || 0;
+    const totalDatasetSize = alignDatasetSize + patchDatasetSize;
+
+    const datasetBuffer = Buffer.from(datasetString, "utf-8");
     try {
-      const finetuningResponse: FinetuneJob = await this.apiProviders[
-        'openai'
-      ].finetune(datasetString, finetuneHash);
+      const finetuneProvider = this.functionConfigs[funcHash].distilledModel.provider;
+      const finetuningResponse: FinetuneJob = await(await this.apiManager.getProvider(
+        finetuneProvider
+      )).finetune(datasetBuffer, finetuneHash);
+
       this.functionConfigs[funcHash].currentTrainingRun = {
         jobId: finetuningResponse.id,
-        trainedOnDatapoints: alignDataset.length + patchDataset.length,
+        trainedOnDatapoints: totalDatasetSize,
         lastChecked: new Date().toISOString(),
       };
 
@@ -613,14 +673,15 @@ export class FunctionModeler {
       jobId !== undefined
     ) {
       try {
-        const response: FinetuneJob = await this.apiProviders[
-          'openai'
-        ].getFinetuned(jobId);
+        const finetuneProvider = this.functionConfigs[funcHash].distilledModel.provider;
+        const response: FinetuneJob = await (await this.apiManager.getProvider(
+          finetuneProvider
+        )).getFinetuned(jobId);
         this.functionConfigs[funcHash].currentTrainingRun.lastChecked =
           now.toISOString();
 
         if (['succeeded', 'failed'].includes(response.status)) {
-          this.updateFinetuneConfig(response, funcHash, response.status);
+          this.updateFinetuneConfig(response, funcHash);
         } else {
           this.updateConfigFile(funcHash);
         }
@@ -633,11 +694,10 @@ export class FunctionModeler {
   private updateFinetuneConfig(
     response: FinetuneJob,
     funcHash: string,
-    status: string
   ): void {
     const defaultTrainedOnDatapoints = 0; // Default value for trainedOnDatapoints
 
-    if (status === 'failed') {
+    if (response.status === 'failed') {
       this.functionConfigs[funcHash].currentTrainingRun = {};
     } else {
       this.functionConfigs[funcHash].distilledModel =

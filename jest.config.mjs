@@ -6,9 +6,6 @@ export default {
     '^.+\\.tsx?$': 'babel-jest'
   },
   extensionsToTreatAsEsm: ['.ts'],
-  transformIgnorePatterns: [
-    "node_modules/(?!(axios)/)" // add other packages here if needed
-  ],
   collectCoverageFrom: [
     '<rootDir>/src/**/*.ts',
     '!<rootDir>/src/types/**/*.ts',

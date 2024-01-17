@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "paths": {
+      "tanuki": [
+        "src/tanuki.ts"
+      ],
+      "tanuki/*": [
+        "src/*"
+      ]
+    }
+  },
+  "include": [
+    "src/*.ts",
+    "src/**/*.ts",
+    "tests/**/*.ts",
+    "tests/*.ts",
+    "lib/src/embedding.d.ts"
+  ]
+}

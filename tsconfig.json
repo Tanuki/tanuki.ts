@@ -1,11 +1,10 @@
 {
   "compilerOptions": {
     /* Visit https://aka.ms/tsconfig.json to read more about this file */
-
     /* Basic Options */
     // "incremental": true,                         /* Enable incremental compilation */
     "target": "esnext",                                /* Specify ECMAScript target version: 'ES3' (default), 'ES5', 'ES2015', 'ES2016', 'ES2017', 'ES2018', 'ES2019', 'ES2020', or 'ESNEXT'. */
-    "module": "commonjs",                           /* Specify module code generation: 'none', 'commonjs', 'amd', 'system', 'umd', 'es2015', 'es2020', or 'ESNext'. */
+    "module": "esnext",                           /* Specify module code generation: 'none', 'commonjs', 'amd', 'system', 'umd', 'es2015', 'es2020', or 'ESNext'. */
     //"build": "tsc",
     // "lib": [],                                   /* Specify library files to be included in the compilation. */
     // "allowJs": true,                             /* Allow javascript files to be compiled. */
@@ -23,10 +22,22 @@
     // "noEmit": true,                              /* Do not emit outputs. */
     // "importHelpers": true,                       /* Import emit helpers from 'tslib'. */
     // "downlevelIteration": true,                  /* Provide full support for iterables in 'for-of', spread, and destructuring when targeting 'ES5' or 'ES3'. */
-    // "isolatedModules": true,                     /* Transpile each file as a separate module (similar to 'ts.transpileModule'). */
+    // "isolatedModules": true,
+    "importHelpers": true,
+    /* Transpile each file as a separate module (similar to 'ts.transpileModule'). */
     "plugins": [
-        { "transform": "./src/tanukiTransformer.ts" }
+        {
+          "transform": "./src/tanukiTransformer.ts",
+          //"after": true,
+          /*"resolvePathAliases": true,
+          /*"resolvePathAliases": true,
+          "tsConfig": "./transformer.tsconfig.json"
+          /*
+          "after": true,
+          "transformProgram": true*/
+        }
     ],
+    /*"traceResolution": true,*/
     /* Strict Type-Checking Options */
     "strict": true,                                 /* Enable all strict type-checking options. */
     // "noImplicitAny": true,                       /* Raise error on expressions and declarations with an implied 'any' type. */
@@ -47,8 +58,7 @@
 
     /* Module Resolution Options */
     "moduleResolution": "node",                  /* Specify module resolution strategy: 'node' (Node.js) or 'classic' (TypeScript pre-1.6). */
-    // "baseUrl": "./",                             /* Base directory to resolve non-absolute module names. */
-    // "paths": {},                                 /* A series of entries which re-map imports to lookup locations relative to the 'baseUrl'. */
+    // "baseUrl": "./",                             /* Base directory to resolve non-absolute module names. */     /* A series of entries which re-map imports to lookup locations relative to the 'baseUrl'. */
     // "rootDirs": [],                              /* List of root folders whose combined content represents the structure of the project at runtime. */
     // "typeRoots": [],                             /* List of folders to include type definitions from. */
     // "types": [],                                 /* Type declaration files to be included in compilation. */
@@ -66,14 +76,20 @@
     /* Experimental Options */
     "experimentalDecorators": true,              /* Enables experimental support for ES7 decorators. */
     "emitDecoratorMetadata": true,               /* Enables experimental support for emitting type metadata for decorators. */
-
+    /*"baseUrl": "./src", */                            /* Base directory to resolve non-absolute module names. */
     /* Advanced Options */
     "skipLibCheck": true,                           /* Skip type checking of declaration files. */
     "forceConsistentCasingInFileNames": true        /* Disallow inconsistently-cased references to the same file. */
   },
+  "references": [
+    { "path": "./src/tanuki.ts" }
+  ],
   "include": [
+    "src/*.ts",
     "src/**/*.ts",
-    "test/**/*.ts",
+    "tests/**/*.ts",
+    "tests/*.ts",
     "lib/src/embedding.d.ts",
+    "lib/src/languageModels/llmConfigs/baseConfig.d.ts"
   ]
 }

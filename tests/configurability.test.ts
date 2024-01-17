@@ -19,10 +19,8 @@ describe('Configurability Tests', () => {
   test('test_configurability', () => {
     // Set up basic configuration
 
-    //const tanuki = new Tanuki()
-
     Tanuki.align((it) => {
-      it("should evaluate clearly true statements as true", (expect) => {
+      it("Specify how our functions should behave.", (expect) => {
         expect(Functions.doubleNumber(2)).toEqual(4);
         expect(Functions.doubleNumber(3)).toEqual(6);
         expect(Functions.tripleNumber(2)).toEqual(6);

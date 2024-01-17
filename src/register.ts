@@ -1,6 +1,6 @@
 import { FunctionDescription } from "./models/functionDescription";
 import { FunctionType } from "./models/functionType";
-import PatchFunctionCompiler from "./patchFunctionCompiler";
+import { PatchFunctionCompiler } from "./tanukiTransformer";//"./patchFunctionCompiler";
 import fs from "fs";
 import path from "path";
 import { JSONSchema } from "./models/jsonSchema";
@@ -34,16 +34,34 @@ export class Register {
     }
 
     // Define the input file path within the dist directory
-    const inputPath = path.join(distDirectory, 'output.json');
+    const inputPath = path.join(distDirectory, 'output.jsonl');
+    let patchFunctions = []
+    if (!fs.existsSync(inputPath)) {
+      throw new Error('JSON file does not exist.');
+    }
+
+    const fileContents = fs.readFileSync(inputPath, 'utf8');
+    const lines = fileContents.split(/\r?\n/);
+
+    for (const line of lines) {
+      if (line) {
+        try {
+          const obj = JSON.parse(line) as FunctionDescriptionJSON;
+          patchFunctions.push(obj);
+        } catch (e) {
+          console.error(`Error parsing line: ${e}`);
+        }
+      }
+    }
 
     if (!fs.existsSync(inputPath)) {
       console.error('JSON file not found:', inputPath);
       return;
     }
 
-    const fileContent = fs.readFileSync(inputPath, 'utf8');
-    const jsonContent = JSON.parse(fileContent) as FunctionDescriptionJSON[];
-    const patchFunctions: FunctionDescription[] = jsonContent.map(item => {
+    //const fileContent = fs.readFileSync(inputPath, 'utf8');
+    //const jsonContent = JSON.parse(fileContent) as FunctionDescriptionJSON[];
+    /*const patchFunctions: FunctionDescription[] = jsonContent.map(item => {
       return new FunctionDescription(
         item.name,
         item.docstring,
@@ -53,10 +71,18 @@ export class Register {
         item.outputTypeSchema,
         item.type ?? FunctionType.SYMBOLIC
       );
-    });
+    });*/
 
-    patchFunctions.forEach(pf => {
-      // Assuming all functions as SYMBOLIC for this example
+    patchFunctions.forEach(pfj => {
+      const pf = new FunctionDescription(
+        pfj.name,
+        pfj.docstring,
+        undefined,
+        undefined,
+        pfj.inputTypeSchema,
+        pfj.outputTypeSchema,
+        pfj.type ?? FunctionType.SYMBOLIC
+      );
       if (pf.type === FunctionType.SYMBOLIC) {
         this.alignableSymbolicFunctions[pf.name] = pf;
       } else if (pf.type === FunctionType.EMBEDDABLE) {
@@ -134,6 +160,9 @@ export class Register {
     return functionDescription;
     throw new Error("Method not implemented.");
   }*/
+  static getNamedFunctions(): string[] {
+    return [...Object.keys(this.alignableSymbolicFunctions), ...Object.keys(this.alignableEmbeddingFunctions)];
+  }
   static loadFunctionDescription(functionName: string, docString: string): FunctionDescription {
     // Iterate over alignableSymbolicFunctions
     for (const key in this.alignableSymbolicFunctions) {
@@ -148,7 +177,6 @@ export class Register {
         return this.alignableEmbeddingFunctions[key];
       }
     }
-
     // If no match is found
     throw new Error(`FunctionDescription with name "${functionName}" and docString "${docString}" not found.`);
   }
