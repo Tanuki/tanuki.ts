@@ -1,5 +1,5 @@
-import { Tanuki, patch } from '../src/tanuki';
 import { Embedding } from '../src/models/embedding';
+import { patch, Tanuki } from "../src/tanuki";
 
 const tanuki = new Tanuki()
 
@@ -45,50 +45,50 @@ type StringType = string;
 type Input = { msg: StringType };
 
 class SentimentAnalyzer {
-  static doubleNumber = patch<number, number>()`Double the input number`;
-
-  static isActive = patch<Status, string>()`Check if the string is active`;
-
-  static getSentiment = patch<Sentiment, Input>({ ignoreFinetuneFetching: true })
+  getSentiment = patch<Sentiment, Input>({ ignoreFinetuneFetching: true })
     `Evaluate the sentiment of a statement provided`;
 
-  static getEmbedding = patch<Embedding<number>, Input>()
+  doubleNumber = patch<number, number>()`Double the input number`;
+
+  isActive = patch<Status, string>()`Check if the string is active`;
+
+  getEmbedding = patch<Embedding<number>, Input>()
     `Get the embedding of a statement provided`;
 }
 
 
 (async () => {
-  const active = await SentimentAnalyzer.isActive('active');
+  const active = await new SentimentAnalyzer().isActive('active');
   console.log(active)
-  const doubled = await SentimentAnalyzer.doubleNumber(2);
+  const doubled = await new SentimentAnalyzer().doubleNumber(2);
   console.log(doubled);
-  const sentiment: Sentiment = await SentimentAnalyzer.getSentiment({msg: 'This is good'});
+  const sentiment: Sentiment = await new SentimentAnalyzer().getSentiment({msg: 'This is good'});
   console.log(sentiment);
   // Rest of your async code
 })().catch(err => console.error(err));
 
 
-const result: Promise<Sentiment> = SentimentAnalyzer.getSentiment({msg: 'This is good'});
+const result: Promise<Sentiment> = new SentimentAnalyzer().getSentiment({msg: 'This is good'});
 //const resultEmbedding: Embedding<number> = SentimentAnalyzer.getEmbedding({msg: 'This is good'});
 console.log(result);
 
-void SentimentAnalyzer.getSentiment({msg: 'This is good'}).then((result) => {
+void new SentimentAnalyzer().getSentiment({msg: 'This is good'}).then((result) => {
   console.log(result);
   return result;
 });
 Tanuki.align((it) => {
   it("should evaluate clearly true statements as true", (expect) => {
-    expect(SentimentAnalyzer.getSentiment({ msg: 'This is good' })).toMatchObject({
+    expect(new SentimentAnalyzer().getSentiment({ msg: 'This is good' })).toMatchObject({
       data: {
         name: 'This is good',
       }
     })
     expect(
-      SentimentAnalyzer.getEmbedding({ msg: 'This is good' })
+      new SentimentAnalyzer().getEmbedding({ msg: 'This is good' })
     ).toEqual(
-      SentimentAnalyzer.getEmbedding({ msg: 'This is great' })
+      new SentimentAnalyzer().getEmbedding({ msg: 'This is great' })
     )
-    expect(SentimentAnalyzer.getSentiment({ msg: 'This is good' })).toEqual({
+    expect(new SentimentAnalyzer().getSentiment({ msg: 'This is good' })).toEqual({
       data: {
         name: 'This is good',
       }

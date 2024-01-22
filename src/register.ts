@@ -1,9 +1,10 @@
 import { FunctionDescription } from "./models/functionDescription";
 import { FunctionType } from "./models/functionType";
-import { PatchFunctionCompiler } from "./tanukiTransformer";//"./patchFunctionCompiler";
+//import { PatchFunctionCompiler } from "./tanukiTransformer";//"./patchFunctionCompiler";
 import fs from "fs";
 import path from "path";
 import { JSONSchema } from "./models/jsonSchema";
+import { PatchFunctionCompiler } from "./tanukiTransformer";
 
 interface FunctionDescriptionJSON {
   name: string;
@@ -100,6 +101,7 @@ export class Register {
     }
     return undefined;
   }
+  /*
   static functionNamesToPatch(instance?: any, type?: FunctionType): string[] {
     if (instance) {
       return Object.keys(instance).filter(key => {
@@ -114,8 +116,10 @@ export class Register {
     }
   }
 
+   */
+
   // eslint-disable-next-line @typescript-eslint/ban-types
-  static functionsToPatch(instance?: any, type?: FunctionType): Record<string, Function> {
+  /*static functionsToPatch(instance?: any, type?: FunctionType): Record<string, Function> {
     const functionNames = Register.functionNamesToPatch(instance, type);
     return functionNames.reduce((acc, funcName) => {
       if (type === FunctionType.SYMBOLIC || !type) acc[funcName] = alignableSymbolicFunctions[funcName];
@@ -133,7 +137,7 @@ export class Register {
       alignableEmbeddingFunctions[func.name] = func;
     }
   }
-
+*/
  /* static loadFunctionDescriptionFromName(funcName: string, instance?: any): FunctionDescription {
     // eslint-disable-next-line @typescript-eslint/ban-types
     let func: Function;

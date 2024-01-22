@@ -1,4 +1,3 @@
-import EmbeddingAPI from './embeddingAPI';
 import { FunctionDescription } from '../models/functionDescription';
 import { Embedding } from '../models/embedding';
 import FunctionModeler from '../functionModeler';

@@ -1,7 +1,7 @@
 export default {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  testMatch: ['**/tests/**/*.spec.ts', '**/tests/*.spec.ts', '**/tests/*.test.ts'],
+  testMatch: ['**/tests/**/*.spec.ts', '**/tests/**/*.test.ts', '**/tests/*.spec.ts', '**/tests/*.test.ts'],
   transform: {
     '^.+\\.tsx?$': 'babel-jest'
   },

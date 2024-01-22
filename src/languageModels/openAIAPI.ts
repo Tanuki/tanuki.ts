@@ -4,12 +4,14 @@ import { Embedding } from '../models/embedding';
 import { FinetuneJob } from '../models/finetuneJob';
 
 import axios from 'redaxios';
-import { CreateEmbeddingResponse, FineTuning } from "openai/resources";
+//import { CreateEmbeddingResponse, FineTuning } from "openai/resources";
 import { Readable } from 'stream';
 import { OpenAIConfig } from "./llmConfigs/openAIConfig";
 import { DEFAULT_DISTILLED_MODEL_NAME, DEFAULT_GENERATIVE_MODELS } from "../constants";
 import { BaseModelConfig } from "./llmConfigs/baseModelConfig";
-import FineTuningJob = FineTuning.FineTuningJob;
+import CreateEmbeddingResponse = OpenAI.CreateEmbeddingResponse;
+import FineTuning = OpenAI.FineTuning;
+import { FineTuningJob } from "openai/resources/fine-tuning";
 
 const LLM_GENERATION_PARAMETERS: string[] = ["temperature", "top_p", "max_new_tokens", "frequency_penalty", "presence_penalty"]
 
@@ -67,7 +69,7 @@ export class OpenAIAPI {
    * @param maxRetries
    */
   public async generate(
-    model: string,
+    model: OpenAIConfig,
     systemMessage: string,
     prompt: string,
     kwargs: {
@@ -86,7 +88,7 @@ export class OpenAIAPI {
     } = kwargs;
 
     const params: OpenAI.Chat.ChatCompletionCreateParams = {
-      model: model,
+      model: model.modelName,
       messages: [
         { role: "system", content: systemMessage },
         { role: "user", content: prompt }

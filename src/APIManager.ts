@@ -1,8 +1,5 @@
-// Assuming constants are defined in a similar way as in Python
 import { OPENAI_PROVIDER, LLAMA_BEDROCK_PROVIDER, TITAN_BEDROCK_PROVIDER } from './constants';
-import { OpenAIAPI } from "./languageModels/openAIAPI";
-import { FinetuneJob } from "./models/finetuneJob";
-import { TitanBedrockAPI } from "./languageModels/titanBedrockAPI";
+import { FinetuneJob } from './models/finetuneJob';
 
 interface Finetunable {
   listFinetuned: (limit: number) => Promise<FinetuneJob[]>;

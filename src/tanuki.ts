@@ -1,6 +1,6 @@
 import * as ts from 'typescript';
 import * as path from 'path';
-import PatchFunctionCompiler from './patchFunctionCompiler';
+//import PatchFunctionCompiler from './patchFunctionCompiler';
 import { IDatasetWorker } from './trackers/IDatasetWorker';
 import FilesystemBufferedLogger from './trackers/filesystemBufferedLogger';
 import { OpenAIAPI } from './languageModels/openAIAPI';
@@ -15,14 +15,20 @@ import * as dotenv from 'dotenv';
 import { FunctionType } from './models/functionType';
 import fs from 'fs';
 import { APIManager } from "./APIManager";
+import { DEFAULT_TEACHER_MODEL_NAMES } from "./constants";
 dotenv.config();
 
 type ExpectFunctionType = (actual: any) => {
-  toMatchObject: (expected: any) => void;
-  toEqual: (expected: any) => void;
-  toBe: (expected: any) => void;
-  notEqual: (expected: any) => void;
-  // Add other methods as necessary
+  toMatchObject: (expected: any) => Promise<void>;
+  toEqual: (expected: any) => Promise<void>;
+  toBe: (expected: any) => Promise<void>;
+  toBeNull: () => Promise<void>;
+  not: {
+    toMatchObject: (expected: any) => Promise<void>;
+    toEqual: (expected: any) => Promise<void>;
+    toBe: (expected: any) => Promise<void>;
+    toBeNull: () => Promise<void>;
+  };
 };
 // Type for the 'it' function
 type ItFunctionType = (
@@ -70,7 +76,7 @@ export class Tanuki {
   private static isAlignActive = false;
   constructor() {
     // eslint-disable-next-line @typescript-eslint/unbound-method
-    const configPath = ts.findConfigFile(
+    /*const configPath = ts.findConfigFile(
       './',
       // eslint-disable-next-line @typescript-eslint/unbound-method
       fs.existsSync,
@@ -94,6 +100,8 @@ export class Tanuki {
     );
     const patchFunctionCompiler = new PatchFunctionCompiler(program);
     patchFunctionCompiler.compile();
+
+     */
   }
 
   static isWithinAlign() {
@@ -147,36 +155,32 @@ export class Tanuki {
           }
         }
       }
-      const expect: ExpectFunctionType = actual => ({
-        toMatchObject: async expected => {
+      const expect: ExpectFunctionType = (actual) => {
+        const baseExpectation = async (expected: any, equal: boolean) => {
           handleAlignStatement({
-            actual: await actual,
+            actual: actual,
             expected: expected,
-            equal: true,
+            equal: equal,
           });
-        },
-        toEqual: async expected => {
-          handleAlignStatement({
-            actual: await actual,
-            expected: expected,
-            equal: true,
-          });
-        },
-        toBe: async expected => {
-          handleAlignStatement({
-            actual: await actual,
-            expected: expected,
-            equal: true,
-          });
-        },
-        notEqual: async expected => {
-          handleAlignStatement({
-            actual: await actual,
-            expected: expected,
-            equal: false,
-          });
-        },
-      });
+        };
+
+        const baseObj = {
+          toMatchObject: (expected: any) => baseExpectation(expected, true),
+          toEqual: (expected: any) => baseExpectation(expected, true),
+          toBe: (expected: any) => baseExpectation(expected, true),
+          toBeNull: () => baseExpectation(null, true),
+        };
+
+        return {
+          ...baseObj,
+          not: {
+            toMatchObject: (expected: any) => baseExpectation(expected, false),
+            toEqual: (expected: any) => baseExpectation(expected, false),
+            toBe: (expected: any) => baseExpectation(expected, false),
+            toBeNull: () => baseExpectation(null, false),
+          },
+        };
+      };
 
       testFn(expect);
     };
@@ -204,11 +208,17 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
         FunctionModeler.setConfig(functionDescription.hash(), config);
       }
 
+      if (!config?.teacherModels) {
+        config = {
+          ...config,
+          teacherModels: DEFAULT_TEACHER_MODEL_NAMES
+        };
+      }
       if (config && config.teacherModels && config?.teacherModels?.length > 0) {
         FunctionModeler.configureTeacherModels(config.teacherModels, functionDescription.hash(), functionDescription.type);
       }
 
-      // Alter behavior if within tanuki.align
+      // Flag that we are within a tanuki.align block
       if (Tanuki.isWithinAlign()) {
         // This is a total hack. We need to figure out a better way to do this rather than abusing the type system.
         return {
@@ -257,25 +267,48 @@ export function getCallerInfo(availableFunctionNames: string[]): string {
   }
   return '';
 }*/
-export function getCallerInfo(availableFunctionNames: string[]): string {
+export function getCallerInfo(availableFunctionPaths: string[]): string {
+  // availableFunctionPaths is an array of function names with their parent objects prepended.
+  // We need to just get the function name, so we split on the '.' and take the last element.
+  const availableFunctionNames = availableFunctionPaths.map((path) => path.split('.').pop() as string);
   try {
     // Throw an error and catch it to access the stack trace
     throw new Error();
   } catch (error) {
     if (error instanceof Error && error.stack) {
       const stackLines = error.stack.split('\n');
-
+      let functionName: string = '';
+      let path = '';
       // Iterate through stack lines and match with available function names
       for (const line of stackLines) {
         // Use a regular expression to extract a potential function name
         const match = /at\s+([^\s]+)\s+/.exec(line);
         if (match && match[1]) {
+
           // Check if extracted name is in the list of available function names
-          const functionName = match[1].split('.').pop(); // Extracting function name
-          if (functionName && availableFunctionNames.includes(functionName)) {
-            return functionName; // Returns the matched function name
+          path = match.input?.split('(')[1].split(')')[0];
+          const functionName_ = match[1].split('.').pop(); // Extracting function name
+          if (functionName_ && availableFunctionNames.includes(functionName_)) {
+            functionName = functionName_; // Returns the matched function name
           }
         }
+      }
+      if (functionName !== '') {
+        for (const line of stackLines) {
+          // Use a regular expression to extract a potential function name
+          const matchForParentObject = /\s+at\s(\w+)\.apply\s\[as\s+/.exec(line);
+          if (matchForParentObject && matchForParentObject[1]) {
+            // Check to see if functionName is in matchForParentObject[1]
+            if (matchForParentObject.input.includes(functionName)) {
+              const parentObject = matchForParentObject[1].split('.').pop(); // Extracting function name
+
+              if (parentObject && parentObject !== 'Function') {
+                functionName = parentObject + '.' + functionName;
+              }
+            }
+          }
+        }
+        return functionName;
       }
     }
   }

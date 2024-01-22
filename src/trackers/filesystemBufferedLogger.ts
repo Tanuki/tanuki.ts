@@ -16,9 +16,9 @@ import * as path from 'path';
 export class FilesystemBufferedLogger extends AbstractBufferedLogger {
   private logDirectory: string;
 
-  constructor() {
+  constructor(logDirectory?: string) {
     super();
-    this.logDirectory = this.getLogDirectory();
+    this.logDirectory = logDirectory || this.getLogDirectory();
 
     // These have to be called after the log directory is set, and not in the abstract constructor
     // This differs from the Python implementation, as in Python, super() doesn't have to be called first.

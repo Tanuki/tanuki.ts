@@ -24,7 +24,7 @@ export class LanguageModelManager {
   private models: Record<string, Model>; // Define the model structure as needed
   private instructionTokenCount: number;
   private systemMessageTokenCount: number;
-  private currentGenerators: Record<string, any>;
+  private currentGenerators: Map<string, any>;
   private defaultGenerationLength: number;
 
   constructor(
@@ -33,7 +33,7 @@ export class LanguageModelManager {
     apiProviders: APIManager
   ) {
     this.defaultGenerationLength = generationTokenLimit
-    this.currentGenerators = {};
+    this.currentGenerators = new Map<string, any>();
     this.apiProviders = apiProviders;
     this.functionModeler = functionModeler;
     this.instruction =
@@ -177,7 +177,7 @@ export class LanguageModelManager {
   ): Promise<string> {
       const systemMessage = model.systemMessage;
       // @ts-ignore
-    return await this.apiProviders[model.provider].generate(
+    return await (await this.apiProviders.getProvider(model.provider)).generate(
         model,
         systemMessage,
         prompt,
@@ -346,7 +346,8 @@ export class LanguageModelManager {
         model
       );
       console.info(`Previous output failed type validation, attempting to repair with ${model.modelName}`)
-      return await this.synthesiseAnswer(prompt, model, generationParameters);
+      const output = await this.synthesiseAnswer(prompt, model, generationParameters);
+      return output
     } else {
       return null;
     }
@@ -433,7 +434,7 @@ export class LanguageModelManager {
     let valid = false;
     let retryIndex = 5;
     const f = JSON.stringify(functionDescription);
-    const typeHint = <string>functionDescription.outputTypeDefinition;
+    const typeHint = JSON.stringify(functionDescription.outputTypeSchema);
     const error = `Output type was not valid. Expected a valid object of type ${typeHint}, got '${choice}'`;
     const failedOutputsList: [string, string][] = [[choice, error]];
     let choiceParsed: any;
