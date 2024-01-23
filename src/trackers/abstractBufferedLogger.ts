@@ -18,13 +18,14 @@ import {
   PATCH_FILE_EXTENSION,
   POSITIVE_FILE_EXTENSION
 } from "../constants";
+import { ModelConfigFactory } from "../languageModels/llmConfigs/modelConfigFactory";
 //import { FunctionConfig } from "../models/functionConfig";
 
 abstract class AbstractBufferedLogger implements IDatasetWorker {
   private buffers: Record<string, Buffer>;
   private mappedFiles: Record<string, string>;
-  private missCount: number;
-  private hitCount: number;
+  missCount: number;
+  hitCount: number;
   private flushLimit: Record<string, number>;
   private bufferRollingSize: Record<string, number>;
   private writeCount: number;
@@ -76,10 +77,7 @@ abstract class AbstractBufferedLogger implements IDatasetWorker {
   abstract getHashFromPath(path: string): string;
   abstract doesObjectExist(path: string): boolean;
 
-  // Method implementations follow the logic in your Python code
-  // ...
-
-  protected createBloomFilter(): BloomFilter {
+  createBloomFilter(): BloomFilter {
     const bloomFilterPersistence = this.getBloomFilterPersistence();
     return new BloomFilter(
       bloomFilterPersistence,
@@ -92,13 +90,20 @@ abstract class AbstractBufferedLogger implements IDatasetWorker {
     try {
       this.bloomFilter.load(); // Assuming 'load' method exists on BloomFilter
     } catch (error) {
-      if (error instanceof Error && error.message.includes('ENOENT')) {
+      // @ts-ignore
+      if (error.code == 'ENOENT') {
         // 'ENOENT' is typically the error code for a missing file in Node.js
         this.debug('No Bloom filter found. Creating a new one.');
       } else {
         // Re-throw the error if it's not a file not found error
         throw error;
       }
+      //{
+      //   "errno": -2,
+      //   "code": "ENOENT",
+      //   "syscall": "open",
+      //   "path": "/var/folders/k4/30j4ydp16q1dh2yn06yjv13w0000gn/T/tanuki-Ggct7B/bloom_filter_state.bin"
+      // }
     }
   }
 
@@ -330,9 +335,10 @@ abstract class AbstractBufferedLogger implements IDatasetWorker {
       if (!this.doesObjectExist(configPath)) {
         functionConfig = this.defaultFunctionConfig;
         defaultUsed = true;
+        functionConfig.teacherModels = []
         this.writeJson(configPath, functionConfig);
       } else {
-        functionConfig = this.readJson(configPath) as FunctionConfig;
+        functionConfig = ModelConfigFactory.loadFunctionConfigFromDict(this.readJson(configPath));
       }
     } catch (error) {
       functionConfig = this.defaultFunctionConfig;

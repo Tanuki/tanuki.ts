@@ -9,6 +9,7 @@ import { LlamaBedrockConfig } from "./llamaConfig";
 import { OpenAIConfig } from "./openAIConfig";
 import { TitanBedrockConfig } from "./titanConfig";
 import { BaseModelConfig } from "./baseModelConfig";
+import { FunctionConfig } from "../../models/functionConfig";
 
 interface ModelConfigInput {
   modelName: string;
@@ -18,8 +19,31 @@ interface ModelConfigInput {
   [key: string]: any; // This allows for additional dynamic properties
 }
 
-class ModelConfigFactory {
-  static createConfig(inputConfig: string | ModelConfigInput |BaseModelConfig, type: string): BaseModelConfig {
+export class ModelConfigFactory {
+  public static loadFunctionConfigFromDict(jsonObject: any): FunctionConfig {
+    const distilledModel = ModelConfigFactory.createConfig(jsonObject.distilledModel, DISTILLED_MODEL) as BaseModelConfig;
+    const currentModelStats = jsonObject.currentModelStats;
+    const lastTrainingRun = jsonObject.lastTrainingRun;
+    const currentTrainingRun = jsonObject.currentTrainingRun;
+    const nrOfTrainingRuns = jsonObject.nrOfTrainingRuns;
+    const currentModel = jsonObject.currentModel;
+
+    let teacherModels: BaseModelConfig[] = [];
+    if (jsonObject.teacherModels && jsonObject.teacherModels.length > 0) {
+      teacherModels = jsonObject.teacherModels.map((model: any) => ModelConfigFactory.createConfig(model, DISTILLED_MODEL) as BaseModelConfig);
+    }
+
+    return {
+      distilledModel,
+      currentModelStats,
+      lastTrainingRun,
+      currentTrainingRun,
+      teacherModels,
+      nrOfTrainingRuns,
+      currentModel
+    };
+  }
+  public static createConfig(inputConfig: string | ModelConfigInput |BaseModelConfig, type: string): BaseModelConfig {
     if (inputConfig instanceof BaseModelConfig) {
       return inputConfig;
     }

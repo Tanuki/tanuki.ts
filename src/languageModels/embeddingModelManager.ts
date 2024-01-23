@@ -41,15 +41,22 @@ class EmbeddingModelManager<T> {
     functionDescription: FunctionDescription,
     validator: Validator
   ): Promise<Embedding<T>> {
-    const [prompt, model] = this.getEmbeddingCase(input, functionDescription);
-    // @ts-ignore
-    const embeddingResponses: Embedding<T>[] = await this.apiManager[model.provider].embed([prompt]);
+    const [prompt, config] = this.getEmbeddingCase(input, functionDescription);
 
-    // Assuming the first response is the desired embedding
-    const embeddingResponse = embeddingResponses[0];
+    console.log(`Calling ${functionDescription.name} with ${prompt}`)
+    try {
+      const provider = await this.apiManager.getProvider(config.provider);
+      // @ts-ignore
+      const embeddingResponses: Embedding<T>[] = await provider.embed([prompt], config);
 
-    // TODO do some type validation here.
-    return embeddingResponse //validator.instantiate(functionDescription.outputTypeDefinition, embeddingResponse);
+      // Assuming the first response is the desired embedding
+      const embeddingResponse = embeddingResponses[0];
+
+      // TODO do some type validation here.
+      return embeddingResponse //validator.instantiate(functionDescription.outputTypeDefinition, embeddingResponse);
+    } catch (e) {
+      throw new Error(`Embedding provider ${config.provider} is not supported.`);
+    }
   }
 }
 

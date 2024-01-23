@@ -71,7 +71,14 @@ class BloomFilter {
 
   public load(): void {
     this.bitArray = this.persistence.load();
-    // Add additional handling for bit array length checking if needed
+
+    const lengthInBytes = this.bitArray.length/8
+    const expectedLength = Math.ceil(this.size / 8)
+    if (lengthInBytes !== expectedLength) {
+      console.warn("Bit array length does not match expected size, and so might be corrupted. Reinitializing.")
+      this.bitArray = this.initBitArray(this.size)
+      this.save()
+    }
   }
 
   public static optimalBloomFilterParams(n: number, p: number): [number, number] {

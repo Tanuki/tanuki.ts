@@ -29,7 +29,7 @@ export class FunctionModeler {
   public static checkFinetuneBlacklist: Set<string>;
   public static executeFinetuneBlacklist: Set<string>;
   public static storeDataBlacklist: Set<string>;
-  static teacherModelsOverride: Record<string, BaseModelConfig[]>
+  private static teacherModelsOverride: Record<string, BaseModelConfig[]>
 
   private functionConfigs: Record<string, FunctionConfig>;
   private dataWorker: IDatasetWorker;
@@ -68,8 +68,8 @@ export class FunctionModeler {
   }
 
   static configureTeacherModels(teacherModels: (string | BaseModelConfig)[], funcHash: string, taskType: FunctionType): void {
-    if (!(funcHash in this.teacherModelsOverride)) {
-      this.teacherModelsOverride[funcHash] = [];
+    if (!(funcHash in FunctionModeler.teacherModelsOverride)) {
+      FunctionModeler.teacherModelsOverride[funcHash] = [];
     }
 
     let preconfiguredModels = taskType === FunctionType.EMBEDDABLE ? DEFAULT_EMBEDDING_MODELS : DEFAULT_GENERATIVE_MODELS;
@@ -86,7 +86,7 @@ export class FunctionModeler {
         modelConfig = model;
       }
 
-      this.teacherModelsOverride[funcHash].push(modelConfig);
+      FunctionModeler.teacherModelsOverride[funcHash].push(modelConfig);
 
       if (modelConfig.provider !== OPENAI_PROVIDER) {
         if (!FunctionModeler.checkFinetuneBlacklist.has(funcHash)) {
@@ -371,9 +371,12 @@ export class FunctionModeler {
       if (finetuned) {
         this.functionConfigs[funcHash] = finetuneConfig;
       }
-    } else {
-      this.functionConfigs[funcHash] = config;
     }
+    if (FunctionModeler.teacherModelsOverride[funcHash] !== undefined) {
+      config.teacherModels = FunctionModeler.teacherModelsOverride[funcHash]
+    }
+
+    this.functionConfigs[funcHash] = config;
     return this.functionConfigs[funcHash];
   }
 

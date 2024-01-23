@@ -157,14 +157,14 @@ export class LanguageModelManager {
       this.currentGenerators.set(funcHash, model.modelName);
     }
 
-    const choice = this.synthesiseAnswer(
+    const choice = await this.synthesiseAnswer(
       prompt,
       model,
       llmParameters
     );
 
     return new LanguageModelOutput(
-      await choice,
+      choice,
       saveToFinetune,
       isDistilledModel
     );

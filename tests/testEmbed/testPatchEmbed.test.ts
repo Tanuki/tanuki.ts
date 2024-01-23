@@ -1,5 +1,5 @@
 import { patch, Tanuki } from "../../src/tanuki";
-import { Embedding } from "../../lib/models/embedding";
+import { Embedding } from "../../src/models/embedding";
 
 class Embedder {
   static embedSentiment = patch<Embedding<number>, string>()`Classify input objects`;
@@ -7,13 +7,18 @@ class Embedder {
   static isPositiveSentiment = patch<boolean, string>()`Classify sentiment`;
 }
 describe('TestEmbedding', () => {
-  it('align_embed_sentiment', () => {
+  it('align_embed_sentiment', async () => {
     // Assuming embedSentiment returns an Embedding instance
-    Tanuki.align((it) => {
-      it("Specify how our functions should behave.", (expect) => {
-        expect(Embedder.embedSentiment("I love this movie")).not.toEqual(Embedder.embedSentiment("I hate this movie"));
-        expect(Embedder.embedSentiment("I love this movie")).toEqual(Embedder.embedSentiment("I love this film"));
-        expect(Embedder.embedSentiment("I love this movie")).toEqual(Embedder.embedSentiment("I loved watching the movie"));
+    await Tanuki.align((it) => {
+      it("Specify how our functions should behave.", async (expect) => {
+        const i_love_embedding = await Embedder.embedSentiment("I love this movie");
+        const i_hate_embedding = await Embedder.embedSentiment("I hate this movie");
+        const i_love_embedding2 = await Embedder.embedSentiment("I love this film");
+        const i_love_watching_embedding = await Embedder.embedSentiment("I loved watching the movie");
+
+        await expect(i_love_embedding).not.toEqual(i_hate_embedding);
+        await expect(i_love_embedding).toEqual(i_love_embedding2);
+        await expect(i_love_embedding).toEqual(i_love_watching_embedding);
       });
     })
   })
@@ -26,32 +31,67 @@ describe('TestEmbedding', () => {
     expect(embeddingList.getData().every(item => typeof item === 'number')).toBeTruthy();
   });
 
-  it('broken_align_embed_sentiment', () => {
-    const embedding = Embedder.embedSentiment("I love this movie");
-    expect(embedding).not.toEqual("I hate this movie");
+  test('broken_align_embed_sentiment', async () => {
+    const testFunction = async () => {
+      await Tanuki.align((it) => {
+        it("broken_align_embed_sentiment", async (expect) => {
+          const embedding = await Embedder.embedSentiment("I love this movie");
+          await expect(embedding).not.toEqual("I hate this movie");
+        });
+      });
+    };
+    await expect(testFunction).rejects.toThrow();
   });
 
-  it('broken_align_symbolic_with_embeddable', () => {
-    const embedding = Embedder.embedSentiment("I love this movie");
-    const isPositive = Embedder.isPositiveSentiment("I hate this movie");
-    expect(embedding).not.toEqual(isPositive);
+  test('broken_align_symbolic_with_embeddable', async () => {
+    const testFunction = async () => {
+      await Tanuki.align((it) => {
+        it("broken_align_symbolic_with_embeddable", async (expect) => {
+          const embedding = await Embedder.embedSentiment("I love this movie");
+          const isPositive = await Embedder.isPositiveSentiment("I hate this movie");
+          await expect(embedding).not.toEqual(isPositive);
+        });
+      });
+    };
+    await expect(testFunction).rejects.toThrow();
   });
 
-  it('broken_heterogenous_align', () => {
-    const embedding1 = Embedder.embedSentiment("I love this movie");
-    const embedding2 = Embedder.embedSentiment2("I hate this movie");
-    expect(embedding1).not.toEqual(embedding2);
+  test('test_cannot_align_heterogenous', async () => {
+    const testFunction = async () => {
+      await Tanuki.align((it) => {
+        it("align_heterogenous", async (expect) => {
+          const embedding1 = await Embedder.embedSentiment("I love this movie");
+          const embedding2 = await Embedder.embedSentiment2("I hate this movie");
+          try {
+            await expect(embedding1).toEqual(embedding2);
+          } catch (error) {
+            console.error("Error in it callback:", error);
+            throw error;
+          }
+        });
+      });
+    };
+    await expect(testFunction).rejects.toThrow();
   });
 
+  test('broken_heterogenous_align', async () => {
 
-  it('test_cannot_align_heterogenous', () => {
-    expect(() => {
-      const embedding1 = Embedder.embedSentiment("I love this movie");
-      const embedding2 = Embedder.embedSentiment2("I hate this movie");
-      if (embedding1 === embedding2) {
-        throw new Error('Invalid comparison between different types of embeddings');
-      }
-    }).toThrowError();
+    const testFunction = async () => {
+      await Tanuki.align((it) => {
+        it("Specify how our functions should behave.", async (expect) => {
+          try {
+            const embedding1 = await Embedder.embedSentiment("I love this movie");
+            const embedding2 = await Embedder.embedSentiment2("I hate this movie");
+            await expect(embedding1).toEqual(embedding2);
+          } catch (error) {
+            console.error("Error in it callback:", error);
+            throw error; // Ensure the error is thrown to the outer scope
+          }
+        })
+      })
+    }
+    // Use Jest's .toThrow() matcher to expect an error
+    await expect(testFunction).rejects.toThrow();
   });
 });
 

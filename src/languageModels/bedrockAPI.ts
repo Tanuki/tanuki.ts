@@ -13,7 +13,7 @@ export class BedrockAPI {
       modelId: model.modelName, // Assuming BaseModelConfig has a modelId property
       contentType: "application/json",
       accept: "application/json",
-      body: JSON.stringify(body),
+      body: body//JSON.stringify(body),
     };
 
     const command = new InvokeModelCommand(params);

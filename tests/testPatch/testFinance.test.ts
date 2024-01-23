@@ -17,8 +17,6 @@ describe('Stock Analysis Tests', () => {
   it('test_classify_sentiment', async () => {
     const input = "A recent survey by Nationwide, the financial services firm, found that over three-quarters of both Gen Z and millennials expect they will need to continue working into their retirement years because they do not believe Social Security will be enough to rely on in their old age.\nIt's a troubling situation, but the good news is that if you invest in dividend stocks, they can help strengthen your prospects for retirement. Not only can these types of investments increase the value of your portfolio over time, but they will also provide you with recurring cash flow.\nThree dividend stocks that can be excellent investments to include as part of your retirement plan now are UnitedHealth Group (UNH -0.26%), Verizon Communications (VZ 0.83%), and ExxonMobil (XOM 1.31%).";
     const output = await Finance.extractStockWinnersVol6(input);
-    expect(output).toContain("Verizon Communications");
-    expect(output).toContain("ExxonMobil");
-    expect(output).toContain("UnitedHealth Group");
+    expect(output).toEqual({"ExxonMobil": "1.31%", "UnitedHealth Group": "-0.26%", "Verizon Communications": "0.83%"})
   });
 });

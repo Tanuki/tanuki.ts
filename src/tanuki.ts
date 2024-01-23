@@ -15,7 +15,7 @@ import * as dotenv from 'dotenv';
 import { FunctionType } from './models/functionType';
 import fs from 'fs';
 import { APIManager } from "./APIManager";
-import { DEFAULT_TEACHER_MODEL_NAMES } from "./constants";
+import { DEFAULT_EMBEDDING_MODEL_NAME, DEFAULT_TEACHER_MODEL_NAMES } from "./constants";
 dotenv.config();
 
 type ExpectFunctionType = (actual: any) => {
@@ -112,6 +112,7 @@ export class Tanuki {
     //console.log(`Executing test suite: ${description}`);
     Tanuki.isAlignActive = true;
 
+    const testPromises: Promise<any>[] = [];
     const it: ItFunctionType = (desc, testFn) => {
       if (!Tanuki.isAlignActive) {
         throw new Error('it() can only be called within an align block.');
@@ -157,6 +158,12 @@ export class Tanuki {
       }
       const expect: ExpectFunctionType = (actual) => {
         const baseExpectation = async (expected: any, equal: boolean) => {
+          if (actual.functionDescription !== expected.functionDescription && actual.functionDescription.type !== FunctionType.SYMBOLIC) {
+            throw new Error(
+              'Expected function descriptions to match, but they did not. Embeddable functions can only be aligned with invocations of the same function.'
+            );
+          }
+
           handleAlignStatement({
             actual: actual,
             expected: expected,
@@ -182,11 +189,26 @@ export class Tanuki {
         };
       };
 
-      testFn(expect);
+      const testResult = new Promise((resolve, reject) => {
+        Promise.resolve(testFn(expect))
+          .then(resolve)
+          .catch(reject);
+      });
+      if (testResult && typeof testResult.then === 'function') {
+        testPromises.push(testResult);
+      }
     };
-    //global.it = it;
+    // Execute the test suite
     testSuite(it);
-    Tanuki.isAlignActive = false;
+    // Wait for all test promises to complete
+    return Promise.allSettled(testPromises).then(results => {
+      Tanuki.isAlignActive = false;
+      // Check if any of the promises were rejected and throw an error if so
+      const rejectedResult = results.find(result => result.status === 'rejected');
+      if (rejectedResult) {
+        throw "reason" in rejectedResult ? rejectedResult.reason : rejectedResult
+      }
+    });
   }
 }
 
@@ -203,15 +225,23 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
     return async (input: InputType): Promise<OutputType> => {
       const functionName: string = getCallerInfo(Register.getNamedFunctions());
       const functionDescription: FunctionDescription = Register.loadFunctionDescription(functionName, docstring);
-
+      let embeddingCase = false;
       if (config) {
         FunctionModeler.setConfig(functionDescription.hash(), config);
+      }
+
+      if (
+        functionDescription.outputTypeDefinition == 'Embedding' ||
+        functionDescription.type === FunctionType.EMBEDDABLE ||
+        /^Embedding<.*>$/.test(<string>functionDescription.outputTypeDefinition)
+      ) {
+        embeddingCase = true;
       }
 
       if (!config?.teacherModels) {
         config = {
           ...config,
-          teacherModels: DEFAULT_TEACHER_MODEL_NAMES
+          teacherModels: embeddingCase ? [DEFAULT_EMBEDDING_MODEL_NAME] : DEFAULT_TEACHER_MODEL_NAMES
         };
       }
       if (config && config.teacherModels && config?.teacherModels?.length > 0) {
@@ -227,10 +257,7 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
         } as unknown as OutputType;
       }
 
-      if (
-        functionDescription.outputTypeDefinition == 'Embedding' ||
-        /^Embedding<.*>$/.test(<string>functionDescription.outputTypeDefinition)
-      ) {
+      if (embeddingCase) {
         return (await embeddingModeler.call(
           input,
           functionDescription,
@@ -247,26 +274,6 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
   };
 }
 
-/*
-export function getCallerInfo(availableFunctionNames: string[]): string {
-  try {
-    // Throw an error and catch it to access the stack trace
-    throw new Error();
-  } catch (error) {
-    if (error instanceof Error && error.stack) {
-      const stackLines = error.stack.split('\n');
-      // Depending on the environment, you might need to adjust the line number
-      const callerLine: string = stackLines[2] || stackLines[1];
-
-      // Use a regular expression to extract the function name
-      const match = /at Function\.(\w+)/.exec(callerLine);
-      if (match && match[1]) {
-        return match[1]; // Returns the function name
-      }
-    }
-  }
-  return '';
-}*/
 export function getCallerInfo(availableFunctionPaths: string[]): string {
   // availableFunctionPaths is an array of function names with their parent objects prepended.
   // We need to just get the function name, so we split on the '.' and take the last element.

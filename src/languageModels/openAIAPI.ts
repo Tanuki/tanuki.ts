@@ -3,15 +3,20 @@ import { OpenAI, toFile } from 'openai';
 import { Embedding } from '../models/embedding';
 import { FinetuneJob } from '../models/finetuneJob';
 
-import axios from 'redaxios';
 //import { CreateEmbeddingResponse, FineTuning } from "openai/resources";
 import { Readable } from 'stream';
 import { OpenAIConfig } from "./llmConfigs/openAIConfig";
 import { DEFAULT_DISTILLED_MODEL_NAME, DEFAULT_GENERATIVE_MODELS } from "../constants";
 import { BaseModelConfig } from "./llmConfigs/baseModelConfig";
 import CreateEmbeddingResponse = OpenAI.CreateEmbeddingResponse;
-import FineTuning = OpenAI.FineTuning;
-import { FineTuningJob } from "openai/resources/fine-tuning";
+import { FineTuning, FineTuningJob } from "openai/resources/fine-tuning";
+import EmbeddingAPI from "./embeddingAPI";
+import LLMApi from "./LLMApi";
+import * as console from "console";
+import * as Buffer from "buffer";
+import * as process from "process";
+import { APIPromise } from "openai/src/core";
+import { ChatCompletion } from "openai/src/resources/chat/completions";
 
 const LLM_GENERATION_PARAMETERS: string[] = ["temperature", "top_p", "max_new_tokens", "frequency_penalty", "presence_penalty"]
 
@@ -21,7 +26,7 @@ interface FineTuningJobResponse {
   fineTunedModel?: BaseModelConfig | string |null;
 }
 
-export class OpenAIAPI {
+export class OpenAIAPI implements EmbeddingAPI<number>, LLMApi{
   private apiKey: string;
   private client: OpenAI;
   private readonly openaiUrl: string =
@@ -29,9 +34,9 @@ export class OpenAIAPI {
 
   constructor() {
     this.apiKey = process.env.OPENAI_API_KEY || "";
-    if (!this.apiKey) {
+    /*if (!this.apiKey) {
       throw new Error('OpenAI API key is not set');
-    }
+    }*/ //Moved to checkApiKey()
     this.client = new OpenAI({ apiKey: this.apiKey });
   }
 
@@ -80,6 +85,7 @@ export class OpenAIAPI {
     } = {},
     maxRetries = 5 // Define the maximum number of retries
   ): Promise<string> {
+    this.checkApiKey();
     const {
       temperature = 0.1,
       topP = 1,
@@ -104,10 +110,11 @@ export class OpenAIAPI {
     while (retryCount <= maxRetries) {
       try {
         const completion = await this.client.chat.completions.create(params);
+        console.log(completion);
         return completion.choices[0]?.message?.content?.trim() || '';
       } catch (error: any) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         if (retryCount === maxRetries) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
           throw new Error(
             `Error generating response after ${maxRetries} retries: ${errorMessage}`
           );
@@ -194,4 +201,5 @@ export class OpenAIAPI {
       }
     }
   }
+
 }

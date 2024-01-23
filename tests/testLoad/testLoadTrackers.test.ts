@@ -1,9 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import FilesystemBufferedLogger from "../../lib/trackers/filesystemBufferedLogger";
-import { FunctionExample } from "../../lib/models/functionExample";
-
+import FilesystemBufferedLogger from "../../src/trackers/filesystemBufferedLogger";
+import { FunctionExample } from "../../src/models/functionExample";
 describe('FilesystemBufferedLogger Tests', () => {
   let logDirectory: string;
   let logger: FilesystemBufferedLogger;
@@ -30,6 +29,9 @@ describe('FilesystemBufferedLogger Tests', () => {
 
       const afterBitArray = logger.bloomFilter.bitArray;
       const isSame = beforeBitArray.toString() === afterBitArray.toString();
+      if (isSame) {
+        console.log(`Bit arrays are the same after ${i} runs`);
+      }
       expect(isSame).toBe(false);
     }
 
@@ -39,5 +41,4 @@ describe('FilesystemBufferedLogger Tests', () => {
     console.log(`Hits: ${logger.hitCount}, Misses: ${logger.missCount}`);
   });
 
-  // Additional tests can be added here
 });
