@@ -70,8 +70,8 @@ export class LanguageModelManager {
     generationParameters: Record<string, any> = {}
   ): Promise<any> {
 
-    if (generationParameters['max_new_tokens'] === undefined) {
-      generationParameters['max_new_tokens'] = this.defaultGenerationLength;
+    if (generationParameters.max_new_tokens === undefined) {
+      generationParameters.max_new_tokens = this.defaultGenerationLength;
     }
     const output: LanguageModelOutput = await this.generate(
       args,
@@ -233,10 +233,10 @@ export class LanguageModelManager {
         .map(
           align =>
             // eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/restrict-template-expressions
-            `Inputs:\nArgs: ${align.args.toString()}\nOutput: ${align.output.toString()}`
+            `Inputs:\nArgs: ${align.args.toString()}\nOutput: ${align.output ? align.output.toString() : 'null'}`
         )
       const examplesTokenCount = examples.map(example => approximateTokenCount(example)).reduce((sum, current) => sum + current, 0);
-      const generationTokens = llmParameters['max_new_tokens'] ?? this.defaultGenerationLength;
+      const generationTokens = llmParameters.max_new_tokens ?? this.defaultGenerationLength;
       const totalTokenCount =
         examplesTokenCount +
         inputPromptTokenCount +
@@ -329,7 +329,7 @@ export class LanguageModelManager {
       .map(
         align =>
           // eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/restrict-template-expressions
-          `Inputs:\nArgs: ${align.args.toString()}\nOutput: ${align.output.toString()}`
+          `Inputs:\nArgs: ${align.args.toString()}\nOutput: ${align.output ? align.output.toString() : 'null'}`
       )
     const examplesTokenCount = examples.map(example => approximateTokenCount(example)).reduce((sum, current) => sum + current, 0);
     const failedExamplesTokenCount = failedOutputsList.map(failedExample => approximateTokenCount(failedExample[0]) + approximateTokenCount(failedExample[1])).reduce((sum, current) => sum + current, 0);
@@ -445,13 +445,6 @@ export class LanguageModelManager {
           functionDescription.hash(),
           5
         );
-      const examples = aligns
-        .map(
-          align =>
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/restrict-template-expressions
-            `Inputs:\nArgs: ${align.args.toString()}\nOutput: ${align.output.toString()}`
-        )
-        .join('\n');
       choice =
         (await this.repairGenerate(
           args,

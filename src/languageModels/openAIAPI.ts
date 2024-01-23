@@ -91,6 +91,7 @@ export class OpenAIAPI implements EmbeddingAPI<number>, LLMApi{
       topP?: number;
       frequencyPenalty?: number;
       presencePenalty?: number;
+      maxNewTokens?: number;
     } = {},
     maxRetries = 5 // Define the maximum number of retries
   ): Promise<string> {
@@ -99,7 +100,8 @@ export class OpenAIAPI implements EmbeddingAPI<number>, LLMApi{
       temperature = 0.1,
       topP = 1,
       frequencyPenalty = 0,
-      presencePenalty = 0
+      presencePenalty = 0,
+      maxNewTokens = 512
     } = kwargs;
 
     const params: OpenAI.Chat.ChatCompletionCreateParams = {
@@ -109,7 +111,7 @@ export class OpenAIAPI implements EmbeddingAPI<number>, LLMApi{
         { role: "user", content: prompt }
       ],
       temperature: temperature,
-      max_tokens: 512,
+      max_tokens: maxNewTokens,
       top_p: topP,
       frequency_penalty: frequencyPenalty,
       presence_penalty: presencePenalty

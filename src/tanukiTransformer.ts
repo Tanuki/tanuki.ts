@@ -3,9 +3,12 @@ import { PluginConfig, TransformerExtras } from "ts-patch";
 import * as fs from 'fs';
 import * as path from 'path';
 import type * as ts from 'typescript';
-import { isEnumDeclaration, SourceFile } from "typescript";
+import { SourceFile } from "typescript";
 import crypto from "crypto";
-import { REGISTERED_FUNCTIONS_FILENAME } from "./constants";
+
+// This unfortunately has to be defined twice - also in src/constants.ts.
+// This is because this code is run at compile time, before the constants are loaded.
+const REGISTERED_FUNCTIONS_FILENAME = 'functions.jsonl';
 
 enum FunctionType {
   SYMBOLIC = 'symbolic',
@@ -242,6 +245,13 @@ export class PatchFunctionCompiler {
                   : { type: t }
               ),
             };
+        }
+        if (types.includes("null")) {
+          types.splice(types.indexOf("null"), 1)
+          return {
+            oneOf: [{ type: "null"}, { type: 'string', enum: types}],
+            //nullable: true
+          }
         }
         return {
           type: 'string',

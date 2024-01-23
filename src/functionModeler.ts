@@ -285,6 +285,7 @@ export class FunctionModeler {
   ): FunctionExample[] {
     const splitBuffer = new TextDecoder().decode(buffer).split('\n');
     const examples = [];
+    const uniqueExamples = new Set<string>(); // To track unique examples based on a unique identifier
     let exampleElementLimit = EXAMPLE_ELEMENT_LIMIT; // Define this constant as per your application's needs
 
     for (const exampleStr of splitBuffer) {
@@ -300,7 +301,15 @@ export class FunctionModeler {
 
       try {
         const exampleObj = JSON.parse(exampleStr) as FunctionExampleData;
-        // Assuming exampleObj has properties args, kwargs, and output
+
+        // Define a unique identifier for the example, e.g., a combination of args and output
+        const uniqueId = JSON.stringify({ args: exampleObj.args, output: exampleObj.output });
+        if (uniqueExamples.has(uniqueId)) {
+          continue; // Skip if this example is already encountered
+        }
+        uniqueExamples.add(uniqueId);
+
+        // Assuming exampleObj has properties args, and output
         const example = new FunctionExample(exampleObj.args, exampleObj.output);
 
         examples.push(example);

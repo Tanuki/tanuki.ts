@@ -262,13 +262,14 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
         return (await embeddingModeler.call(
           input,
           functionDescription,
-          validator
+          validator,
         )) as unknown as OutputType;
       } else {
         return (await languageModeler.call(
           input,
           functionDescription,
-          validator
+          validator,
+          config.generationParams
         )) as unknown as OutputType;
       }
     };
