@@ -150,7 +150,7 @@ export class LanguageModelManager {
     const funcHash = functionDescription.hash();
 
     if (!this.currentGenerators.has(funcHash)) {
-      console.info(`Generating function outputs for with ${model.modelName}`);
+      console.log(`Generating function outputs for with ${model.modelName}`);
       this.currentGenerators.set(funcHash, model.modelName);
     } else if (this.currentGenerators.get(funcHash) !== model.modelName) {
       console.info(`Switching to ${model.modelName} for function outputs generation`);

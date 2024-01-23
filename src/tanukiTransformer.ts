@@ -202,6 +202,14 @@ export class PatchFunctionCompiler {
         return parseType()
       }
 
+      // Check for array types (e.g., 'string[]')
+      if (token.endsWith('[]')) {
+        const itemType = token.substring(0, token.length - 2).trim();
+        return {
+          type: 'array',
+          items: { type: itemType },
+        };
+      }
       // Handle primitive types (number, string, boolean)
       const primitiveTypes = ['number', 'string', 'boolean', 'null'];
       if (primitiveTypes.includes(token)) {
@@ -217,14 +225,6 @@ export class PatchFunctionCompiler {
         token = getNextToken();
       }
 
-      // Check for array types (e.g., 'string[]')
-      if (token.endsWith('[]')) {
-        const itemType = token.substring(0, token.length - 2).trim();
-        return {
-          type: 'array',
-          items: { type: itemType },
-        };
-      }
 
       if (token === '{') {
         return parseObject();

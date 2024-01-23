@@ -29,7 +29,7 @@ export class FunctionModeler {
   public static checkFinetuneBlacklist: Set<string>;
   public static executeFinetuneBlacklist: Set<string>;
   public static storeDataBlacklist: Set<string>;
-  private static teacherModelsOverride: Record<string, BaseModelConfig[]>
+  static teacherModelsOverride: Record<string, BaseModelConfig[]>
 
   private functionConfigs: Record<string, FunctionConfig>;
   private dataWorker: IDatasetWorker;
