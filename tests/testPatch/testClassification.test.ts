@@ -25,6 +25,6 @@ describe('Sentiment Analysis Tests', () => {
 
   it('test_classify_sentiment', async() => {
     const result = await Classifier.classifySentiment("I like you");
-    expect(result).toEqual(Sentiment.Good);
+    expect(result).toEqual("Good");
   });
 });

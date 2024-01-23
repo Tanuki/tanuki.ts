@@ -5,6 +5,7 @@ import fs from "fs";
 import path from "path";
 import { JSONSchema } from "./models/jsonSchema";
 import { PatchFunctionCompiler } from "./tanukiTransformer";
+import { REGISTERED_FUNCTIONS_FILENAME } from "./constants";
 
 interface FunctionDescriptionJSON {
   name: string;
@@ -35,7 +36,7 @@ export class Register {
     }
 
     // Define the input file path within the dist directory
-    const inputPath = path.join(distDirectory, 'output.jsonl');
+    const inputPath = path.join(distDirectory, REGISTERED_FUNCTIONS_FILENAME);
     let patchFunctions = []
     if (!fs.existsSync(inputPath)) {
       throw new Error('JSON file does not exist.');

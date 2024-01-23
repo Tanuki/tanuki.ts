@@ -251,7 +251,7 @@ export class FunctionModeler {
     Object.entries(writtenDatapoints).forEach(([hash, datapoints]) => {
       if (this.datasetSizes.PATCHES[hash] === -1) {
         this.datasetSizes.PATCHES[hash] = this.getDatasetInfo(
-          'PATCHES',
+          PATCHES,
           hash,
           'length'
         ) as number;
@@ -317,13 +317,13 @@ export class FunctionModeler {
     return examples;
   }
 
-  loadSymbolicAlignStatements(functionHash: string): void {
+  public loadSymbolicAlignStatements(functionHash: string): void {
     if (functionModeler.storeDataBlacklist.has(functionHash)) {
       this.datasetSizes.SYMBOLIC_ALIGNMENTS[functionHash] = 0;
       this.symbolicAlignBuffer[functionHash] = new Uint8Array();
     } else if (!this.symbolicAlignBuffer[functionHash]) {
       const [datasetSize, alignDataset] = this.getDatasetInfo(
-        "SYMBOLIC_ALIGNMENTS",
+        SYMBOLIC_ALIGNMENTS,
         functionHash,
         'both'
       ) as [number, string];

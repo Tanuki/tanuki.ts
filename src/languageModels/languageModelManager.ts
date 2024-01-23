@@ -150,7 +150,7 @@ export class LanguageModelManager {
     const funcHash = functionDescription.hash();
 
     if (!this.currentGenerators.has(funcHash)) {
-      console.log(`Generating function outputs for with ${model.modelName}`);
+      console.log(`Generating function outputs with ${model.modelName}`);
       this.currentGenerators.set(funcHash, model.modelName);
     } else if (this.currentGenerators.get(funcHash) !== model.modelName) {
       console.info(`Switching to ${model.modelName} for function outputs generation`);
@@ -164,7 +164,7 @@ export class LanguageModelManager {
     );
 
     return new LanguageModelOutput(
-      choice,
+      choice.trim(),
       saveToFinetune,
       isDistilledModel
     );
@@ -435,7 +435,7 @@ export class LanguageModelManager {
     let retryIndex = 5;
     const f = JSON.stringify(functionDescription);
     const typeHint = JSON.stringify(functionDescription.outputTypeSchema);
-    const error = `Output type was not valid. Expected a valid object of type ${typeHint}, got '${choice}'`;
+    const error = `Output type was not valid. Expected a valid object of type ${typeHint}, got \`${choice}\``;
     const failedOutputsList: [string, string][] = [[choice, error]];
     let choiceParsed: any;
 

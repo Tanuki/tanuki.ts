@@ -2,14 +2,14 @@ import { patch, Tanuki } from "../../src/tanuki";
 import { LlamaBedrockConfig } from "../../src/languageModels/llmConfigs/llamaConfig";
 
 class Classifier {
-  classifySentimentLlama3 = patch<"Good" | "Bad", [string, string]>({
+  classifySentimentLlama3 = patch<"Good" | "Bad" | null, [string, string]>({
     teacherModels: ["llama_70b_chat_aws"],
     generationParams: {
       "max_tokens": 10,
     }
   })`Classify input objects`;
 
-  classifySentimentLlama = patch< "Good" | "Bad", string>({
+  classifySentimentLlama = patch< "Good" | "Bad" | null, string>({
     teacherModels: ["llama_70b_chat_aws"],
   })`Classify input objects`;
 }
@@ -31,14 +31,15 @@ describe('Sentiment Analysis Tests', () => {
     })
   });
 
-  it('test_classify_sentiment', async () => {
+  it('test_classify_sentiment_with_llama', async () => {
     const badInput = "I find you awful";
     const goodInput = "I really really like you";
     const goodInput2 = "I adore you";
 
+    expect(await classier.classifySentimentLlama("I am neutral")).toBeNull();
+
     expect(await classier.classifySentimentLlama("I like you")).toEqual('Good');
     expect(await classier.classifySentimentLlama(badInput)).toEqual('Bad');
-    expect(await classier.classifySentimentLlama("I am neutral")).toBeNull();
 
     expect(await classier.classifySentimentLlama3([goodInput, goodInput2])).toEqual('Good');
     expect(await classier.classifySentimentLlama3(["I do not like you you", badInput])).toEqual('Bad');

@@ -17,6 +17,15 @@ import * as Buffer from "buffer";
 import * as process from "process";
 import { APIPromise } from "openai/src/core";
 import { ChatCompletion } from "openai/src/resources/chat/completions";
+import { CompletionCreateParams } from "openai/src/resources/completions";
+import {
+  APIConnectionError,
+  APIConnectionTimeoutError,
+  APIError,
+  APIUserAbortError, AuthenticationError, BadRequestError, ConflictError, InternalServerError,
+  NotFoundError,
+  OpenAIError, PermissionDeniedError, RateLimitError, UnprocessableEntityError
+} from "openai/error";
 
 const LLM_GENERATION_PARAMETERS: string[] = ["temperature", "top_p", "max_new_tokens", "frequency_penalty", "presence_penalty"]
 
@@ -110,9 +119,15 @@ export class OpenAIAPI implements EmbeddingAPI<number>, LLMApi{
     while (retryCount <= maxRetries) {
       try {
         const completion = await this.client.chat.completions.create(params);
-        console.log(completion);
-        return completion.choices[0]?.message?.content?.trim() || '';
+        return completion?.choices[0]?.message?.content?.trim() || '';
       } catch (error: any) {
+        if (error &&
+            error instanceof PermissionDeniedError ||
+            error instanceof AuthenticationError ||
+            error instanceof NotFoundError ||
+            error instanceof BadRequestError) {
+          throw error;
+        }
         const errorMessage = error instanceof Error ? error.message : String(error);
         if (retryCount === maxRetries) {
           throw new Error(

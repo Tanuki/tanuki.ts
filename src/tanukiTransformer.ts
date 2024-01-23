@@ -5,6 +5,7 @@ import * as path from 'path';
 import type * as ts from 'typescript';
 import { isEnumDeclaration, SourceFile } from "typescript";
 import crypto from "crypto";
+import { REGISTERED_FUNCTIONS_FILENAME } from "./constants";
 
 enum FunctionType {
   SYMBOLIC = 'symbolic',
@@ -93,7 +94,7 @@ class FunctionDescription {
 
 export class PatchFunctionCompiler {
   private readonly sourceFiles: ReadonlyArray<ts.SourceFile>;
-  private typeChecker: ts.TypeChecker;
+  //rivate typeChecker: ts.TypeChecker;
   private typeDefinitions: Record<string, string> = {};
 
   // Default output directory
@@ -109,7 +110,7 @@ export class PatchFunctionCompiler {
   private currentClassOrModule: ts.ClassDeclaration | ts.ModuleDeclaration | null = null;
 
   constructor(private program: ts.Program, tsInstance: typeof ts) {
-    this.typeChecker = program.getTypeChecker();
+    //this.typeChecker = program.getTypeChecker();
     this.sourceFiles = program.getSourceFiles();
     this.ts = tsInstance;
     this.compiledFunctionNames = []
@@ -845,7 +846,7 @@ export class PatchFunctionCompiler {
     }
 
     // Define the output file path within the dist directory
-    const outputPath = path.join(distDirectory, 'output.jsonl');
+    const outputPath = path.join(distDirectory, REGISTERED_FUNCTIONS_FILENAME);
 
     // Convert the patch functions to JSON format
     for (const pf of patchFunctions) {
@@ -865,36 +866,10 @@ export class PatchFunctionCompiler {
     }
 
     // Define the output file path within the dist directory
-    const outputPath = path.join(distDirectory, 'output.jsonl');
+    const outputPath = path.join(distDirectory, REGISTERED_FUNCTIONS_FILENAME);
 
     // Convert the patch functions to JSON format
     fs.writeFileSync(outputPath, '', 'utf8');
-  }
-
-  static loadFromJSON(): FunctionDescription[] {
-    const distDirectory = PatchFunctionCompiler.getDistDirectory();
-    const inputPath = path.join(distDirectory, 'output.jsonl');
-    let patchFunctions: FunctionDescription[] = [];
-
-    if (!fs.existsSync(inputPath)) {
-      throw new Error('JSON file does not exist.');
-    }
-
-    const fileContents = fs.readFileSync(inputPath, 'utf8');
-    const lines = fileContents.split(/\r?\n/);
-
-    for (const line of lines) {
-      if (line) {
-        try {
-          const obj = JSON.parse(line) as FunctionDescription;
-          patchFunctions.push(obj);
-        } catch (e) {
-          console.error(`Error parsing line: ${e}`);
-        }
-      }
-    }
-
-    return patchFunctions;
   }
 
   static getDistDirectory(): string {
