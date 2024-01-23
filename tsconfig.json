@@ -28,13 +28,6 @@
     "plugins": [
         {
           "transform": "./src/tanukiTransformer.ts",
-          //"after": true,
-          /*"resolvePathAliases": true,
-          /*"resolvePathAliases": true,
-          "tsConfig": "./transformer.tsconfig.json"
-          /*
-          "after": true,
-          "transformProgram": true*/
         }
     ],
     /*"traceResolution": true,*/

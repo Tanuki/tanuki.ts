@@ -1,7 +1,7 @@
 {
-  "name": "typescript-npm-package-template",
-  "version": "0.0.0-development",
-  "description": "A template for creating npm packages using TypeScript and VSCode",
+  "name": "tanuki.ts",
+  "version": "0.0.1-development",
+  "description": "TypeScript client for building LLM-powered applications",
   "main": "./lib/index.js",
   "type": "module",
   "files": [
@@ -21,12 +21,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ryansonshine/typescript-npm-package-template.git"
+    "url": "git+https://github.com/Tanuki/tanuki.ts.git"
   },
   "license": "MIT",
   "author": {
     "name": "Jack Hopkins",
-    "email": "ryansonshine@users.noreply.github.com",
+    "email": "jackhopkins@users.noreply.github.com",
     "url": "https://github.com/ryansonshine"
   },
   "engines": {

@@ -1,6 +1,4 @@
 import { patch, Tanuki } from "../../src/tanuki";
-import { LiteralType } from "typescript";
-import { Sentiment } from "../testTypes/testTypes.test";
 
 class Classifier {
   static classifySentiment2 = patch<"Good" | "Bad", [string, string]>()`The sentiment of the input objects`;
