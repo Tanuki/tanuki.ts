@@ -33,13 +33,13 @@ export class LLamaBedrockAPI extends BedrockAPI {
     });
 
     const responseBody = await this.sendApiRequest(model, body);
-    let choice = responseBody["generation"];
+    let choice: string = responseBody["generation"];
 
     if (model.parsingHelperTokens?.endToken) {
       choice = choice.split(model.parsingHelperTokens.endToken)[0];
     }
 
-    return choice;
+    return choice.trim();
   }
 
   public async getFinetuned(jobId: string): Promise<FinetuneJob> {

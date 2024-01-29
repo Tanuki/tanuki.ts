@@ -7,8 +7,8 @@ import { PatchConfig } from './models/patchConfig';
 import { FunctionConfig } from './models/functionConfig';
 import {
   DEFAULT_DISTILLED_MODEL_NAME,
-  DEFAULT_EMBEDDING_MODELS,
-  DEFAULT_GENERATIVE_MODELS,
+  DEFAULT_EMBEDDING_MODELS, DEFAULT_STUDENT_MODELS,
+  DEFAULT_TEACHER_MODELS,
   EXAMPLE_ELEMENT_LIMIT,
   OPENAI_PROVIDER, PATCHES, SYMBOLIC_ALIGNMENTS
 } from "./constants";
@@ -29,6 +29,7 @@ export class FunctionModeler {
   public static checkFinetuneBlacklist: Set<string>;
   public static executeFinetuneBlacklist: Set<string>;
   public static storeDataBlacklist: Set<string>;
+  public static startupLoggingChecker: Set<string>;
   static teacherModelsOverride: Record<string, BaseModelConfig[]>
 
   private functionConfigs: Record<string, FunctionConfig>;
@@ -54,6 +55,7 @@ export class FunctionModeler {
     FunctionModeler.checkFinetuneBlacklist = new Set<string>();
     FunctionModeler.executeFinetuneBlacklist = new Set<string>();
     FunctionModeler.storeDataBlacklist = new Set<string>();
+    FunctionModeler.startupLoggingChecker = new Set<string>();
 
     this.datasetSizes = {
       POSITIVE_EMBEDDABLE_ALIGNMENTS: {},
@@ -72,7 +74,7 @@ export class FunctionModeler {
       FunctionModeler.teacherModelsOverride[funcHash] = [];
     }
 
-    let preconfiguredModels = taskType === FunctionType.EMBEDDABLE ? DEFAULT_EMBEDDING_MODELS : DEFAULT_GENERATIVE_MODELS;
+    let preconfiguredModels = taskType === FunctionType.EMBEDDABLE ? DEFAULT_EMBEDDING_MODELS : DEFAULT_TEACHER_MODELS;
     teacherModels.forEach(model => {
       let modelConfig: BaseModelConfig;
 
@@ -98,17 +100,21 @@ export class FunctionModeler {
       }
     });
   }
-  public static setConfig(functionHash: string, config: PatchConfig) {
+  public static setConfig(functionDescription: FunctionDescription, config: PatchConfig) {
+    const functionHash = functionDescription.hash();
     functionModeler.environmentId = config.environmentId ?? 0;
 
     if (config.ignoreFinetuning) {
       functionModeler.executeFinetuneBlacklist.add(functionHash);
+      console.info(`The flag for ignoring finetuning has been set True for ${functionDescription.name}. No model distillation will be performed.`)
     }
     if (config.ignoreFinetuneFetching) {
       functionModeler.checkFinetuneBlacklist.add(functionHash);
+      console.info(`The flag for ignoring finetune fetching has been set True for ${functionDescription.name}. No already finetuned models will be looked for.`)
     }
     if (config.ignoreDataStorage) {
       functionModeler.storeDataBlacklist.add(functionHash);
+      console.info(`The flag for ignoring data storage has been set True for ${functionDescription.name}. No data will be read or saved and model distillation will not be performed.`)
     }
   }
   private getDatasetInfo(
@@ -153,7 +159,6 @@ export class FunctionModeler {
   private saveContrastiveAlignmentPair(
     functionHash: string,
     args: any[],
-    //kwargs: Record<string, any>,
     pair: [any[], Record<string, any>],
     positive: boolean
   ): void {
@@ -393,10 +398,11 @@ export class FunctionModeler {
     functionDescription: FunctionDescription,
     finetuneProvider: string
   ): Promise<[boolean, FunctionConfig]> {
+    console.info(`Checking for finetunes for ${functionDescription.name} using ${finetuneProvider}`)
     const finetuneHash =
       functionDescription.hash('finetune') + encodeInt(functionModeler.environmentId);
     const finetunes: FinetuneJob[] = await (await this.apiManager.getProvider(
-      'openai'
+      finetuneProvider
     )).listFinetuned(1000);
 
     for (const finetune of finetunes) {
@@ -414,13 +420,14 @@ export class FunctionModeler {
               functionDescription.hash(),
               config
             );
+            console.info(`Found finetuned model for ${functionDescription.name} [${config.distilledModel.modelName}]`)
             return [true, config];
           } catch (error) {
-            console.error('Error constructing config from finetune:', error);
+            console.info(`Found finetuned model for ${functionDescription.name} [${finetune.fineTunedModel.modelName}] but could not load it`)
             return [
               false,
               {
-                distilledModel: DEFAULT_GENERATIVE_MODELS[DEFAULT_DISTILLED_MODEL_NAME],
+                distilledModel: DEFAULT_STUDENT_MODELS[DEFAULT_DISTILLED_MODEL_NAME],
                 currentModelStats: {
                   trainedOnDatapoints: 0,
                   runningFaults: [],
@@ -436,16 +443,19 @@ export class FunctionModeler {
       }
     }
 
+    console.info(`No finetuned model found for ${functionDescription.name}`)
     return [
-      false,
-      {
-        distilledModel: DEFAULT_GENERATIVE_MODELS[DEFAULT_DISTILLED_MODEL_NAME],
-        currentModelStats: { trainedOnDatapoints: 0, runningFaults: [] },
+      false, {
+        distilledModel: DEFAULT_STUDENT_MODELS[DEFAULT_DISTILLED_MODEL_NAME],
+        currentModelStats: {
+          trainedOnDatapoints: 0,
+          runningFaults: [],
+        },
         lastTrainingRun: { trainedOnDatapoints: 0 },
         currentTrainingRun: {},
         teacherModels: [],
         nrOfTrainingRuns: 0,
-      },
+      }
     ];
   }
 
@@ -534,8 +544,8 @@ export class FunctionModeler {
       const currentTrainingRun =
         this.functionConfigs[funcHash]?.currentTrainingRun;
       if (currentTrainingRun && 'job_id' in currentTrainingRun) {
-        await this.checkFinetuningStatus(funcHash);
-      } else if (this.checkFinetuningCondition(funcHash)) {
+        await this.checkFinetuningStatus(funcHash, functionDescription);
+      } else if (this.checkFinetuningCondition(funcHash, functionDescription)) {
         await this.executeFinetuning(functionDescription, funcHash);
       }
     } catch (error) {
@@ -543,7 +553,7 @@ export class FunctionModeler {
     }
   }
 
-  private checkFinetuningCondition(funcHash: string): boolean {
+  private checkFinetuningCondition(funcHash: string, functionDescription: FunctionDescription): boolean {
     if (!(funcHash in this.functionConfigs)) {
       return false;
     }
@@ -561,6 +571,12 @@ export class FunctionModeler {
         'length'
       ) as number;
       this.datasetSizes.PATCHES[funcHash] = patchDatasetSize;
+      if (!FunctionModeler.startupLoggingChecker.has(funcHash)) {
+        console.info(`Function ${functionDescription.name} [${alignDatasetSize} aligns | ${patchDatasetSize} runs] will be finetuned from` +
+          ` ${this.functionConfigs[funcHash].teacherModels[0].modelName} using ${this.functionConfigs[funcHash].distilledModel.provider} in` +
+          `${trainingThreshold - (patchDatasetSize + alignDatasetSize)} runs`);
+        FunctionModeler.startupLoggingChecker.add(funcHash);
+      }
     }
 
     return patchDatasetSize + alignDatasetSize > trainingThreshold;
@@ -651,8 +667,10 @@ export class FunctionModeler {
     const totalDatasetSize = alignDatasetSize + patchDatasetSize;
 
     const datasetBuffer = Buffer.from(datasetString, "utf-8");
+    const finetuneProvider = this.functionConfigs[funcHash].distilledModel.provider;
+
     try {
-      const finetuneProvider = this.functionConfigs[funcHash].distilledModel.provider;
+      console.info(`Starting finetuning for ${functionDescription.name} using ${finetuneProvider}`)
       const finetuningResponse: FinetuneJob = await(await this.apiManager.getProvider(
         finetuneProvider
       )).finetune(datasetBuffer, finetuneHash);
@@ -666,11 +684,11 @@ export class FunctionModeler {
       // Update the config file
       this.updateConfigFile(funcHash);
     } catch (error) {
-      console.error('Error executing finetuning', error);
+      console.error(`Could not start finetuning for ${functionDescription.name} using ${finetuneProvider}. Error: ${error}`)
     }
   }
 
-  async checkFinetuningStatus(funcHash: string): Promise<void> {
+  async checkFinetuningStatus(funcHash: string, functionDescription: FunctionDescription): Promise<void> {
     const currentTrainingRun =
       this.functionConfigs[funcHash]?.currentTrainingRun;
     if (!currentTrainingRun) return;
@@ -693,7 +711,7 @@ export class FunctionModeler {
           now.toISOString();
 
         if (['succeeded', 'failed'].includes(response.status)) {
-          this.updateFinetuneConfig(response, funcHash);
+          this.updateFinetuneConfig(response, funcHash, functionDescription);
         } else {
           this.updateConfigFile(funcHash);
         }
@@ -706,9 +724,9 @@ export class FunctionModeler {
   private updateFinetuneConfig(
     response: FinetuneJob,
     funcHash: string,
+    functionDescription: FunctionDescription
   ): void {
     const defaultTrainedOnDatapoints = 0; // Default value for trainedOnDatapoints
-
     if (response.status === 'failed') {
       this.functionConfigs[funcHash].currentTrainingRun = {};
     } else {
@@ -729,8 +747,12 @@ export class FunctionModeler {
       this.functionConfigs[funcHash].nrOfTrainingRuns++;
       this.functionConfigs[funcHash].currentTrainingRun = {};
     }
-
-    this.updateConfigFile(funcHash);
+    console.info(`Finetuning for ${functionDescription.name} using ${this.functionConfigs[funcHash].distilledModel.provider} finished with status: ${response.status}`)
+    try {
+      this.updateConfigFile(funcHash);
+    } catch(err) {
+      console.error(`Could not update the function configuration file with the finetuned model for ${functionDescription.name}. Error: ${err}`)
+    }
   }
 }
 export default FunctionModeler;

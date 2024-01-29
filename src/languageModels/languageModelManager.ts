@@ -24,7 +24,7 @@ export class LanguageModelManager {
   private models: Record<string, Model>; // Define the model structure as needed
   private instructionTokenCount: number;
   private systemMessageTokenCount: number;
-  private currentGenerators: Map<string, any>;
+  private initializedFunctions: Map<string, any>;
   private defaultGenerationLength: number;
 
   constructor(
@@ -33,7 +33,7 @@ export class LanguageModelManager {
     apiProviders: APIManager
   ) {
     this.defaultGenerationLength = generationTokenLimit
-    this.currentGenerators = new Map<string, any>();
+    this.initializedFunctions = new Map<string, any>();
     this.apiProviders = apiProviders;
     this.functionModeler = functionModeler;
     this.instruction =
@@ -143,18 +143,27 @@ export class LanguageModelManager {
     args: any,
     functionDescription: FunctionDescription,
     llmParameters: Record<string, any> = {}
+    funcHash: string
   ): Promise<LanguageModelOutput> {
+    //const funcHash = functionDescription.hash();
+
     const { prompt, model, saveToFinetune, isDistilledModel } =
-      await this.getGenerationCase(args, functionDescription, llmParameters);
+      await this.getGenerationCase(args, functionDescription, llmParameters, funcHash);
 
-    const funcHash = functionDescription.hash();
 
-    if (!this.currentGenerators.has(funcHash)) {
-      console.log(`Generating function outputs with ${model.modelName}`);
-      this.currentGenerators.set(funcHash, model.modelName);
-    } else if (this.currentGenerators.get(funcHash) !== model.modelName) {
-      console.info(`Switching to ${model.modelName} for function outputs generation`);
-      this.currentGenerators.set(funcHash, model.modelName);
+    let currentFunctionSetup = this.initializedFunctions.get(funcHash);
+    if (currentFunctionSetup) {
+      let generatorModel = currentFunctionSetup.model;
+      if (isDistilledModel) {
+        generatorModel = currentFunctionSetup.model;
+        console.info(`Generating function outputs for ${functionDescription.name} with a finetuned model: ${model.modelName}.`)
+      } else if (generatorModel === "") {
+        console.info(`Found ${currentFunctionSetup.examples.length} align statements for ${functionDescription.name}. Generating function outputs with ${model.modelName}.`);
+        this.initializedFunctions.set(funcHash, { ...currentFunctionSetup, model: model.modelName });
+      } else if (generatorModel !== model.modelName) {
+        console.info(`Switching output generation from ${generatorModel} to ${model.modelName} for function ${functionDescription.name}.`);
+        this.initializedFunctions.set(funcHash, { ...currentFunctionSetup, model: model.modelName });
+      }
     }
 
     const choice = await this.synthesiseAnswer(
@@ -196,7 +205,8 @@ export class LanguageModelManager {
   private async getGenerationCase(
     args: any,
     functionDescription: FunctionDescription,
-    llmParameters: Record<string, any> = {}
+    llmParameters: Record<string, any> = {},
+    funcHash: string
   ): Promise<{
     prompt: string;
     model: BaseModelConfig;
@@ -214,9 +224,14 @@ export class LanguageModelManager {
         f,
         distilledModel
       );
-
+    if (!this.initializedFunctions.has(funcHash)) {
+      this.initializedFunctions.set(funcHash, { examples: [], model: '' });
+    }
     if (isDistilledModel && suitableForDistillation) {
       const prompt = this.constructPrompt(f, args, [], distilledModel);
+      if (!this.initializedFunctions.has(funcHash)) {
+        this.initializedFunctions.set(funcHash, { examples: [], model: 'finetuned_model_placeholder' });
+      }
       return {
         prompt,
         model: distilledModel,
@@ -235,6 +250,7 @@ export class LanguageModelManager {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/restrict-template-expressions
             `Inputs:\nArgs: ${align.args.toString()}\nOutput: ${align.output ? align.output.toString() : 'null'}`
         )
+      this.initializedFunctions.set(funcHash, { examples: examples, model: '' });
       const examplesTokenCount = examples.map(example => approximateTokenCount(example)).reduce((sum, current) => sum + current, 0);
       const generationTokens = llmParameters.max_new_tokens ?? this.defaultGenerationLength;
       const totalTokenCount =
@@ -245,7 +261,13 @@ export class LanguageModelManager {
       const model = this.chooseModelFromTokens(teacherModels, totalTokenCount, examples.length);
 
       if (model) {
-        const prompt = this.constructPrompt(f, args, examples, model);
+        const examplesWithParsingTokens = aligns
+          .map(
+            align =>
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/restrict-template-expressions
+              `Inputs:\nArgs: ${align.args.toString()}\nOutput: ${model.parsingHelperTokens.startToken}${align.output ? align.output.toString() : 'null'}${model.parsingHelperTokens.endToken}`
+          )
+        const prompt = this.constructPrompt(f, args, examplesWithParsingTokens, model);
 
         return {
           prompt,
@@ -300,17 +322,15 @@ export class LanguageModelManager {
   ): string {
     let exampleInput = '';
     if (examples && model.parsingHelperTokens) {
-      const finalExamples = examples.map(example =>
-        `${model.parsingHelperTokens.startToken}${example}${model.parsingHelperTokens.endToken}`
-      ).join('\n');
+      const finalExamples = examples.join('\n');
       exampleInput = `Examples:${finalExamples}\n`;
     }
 
     const instructionPrompt = model.instructions;
     const argsString = JSON.stringify(args);
     const inputToken = model.parsingHelperTokens ? model.parsingHelperTokens.startToken : '';
-
-    return `${instructionPrompt}\nFunction: ${f}\n${exampleInput}---\n${inputToken}Inputs:\nArgs: ${argsString}\nOutput:`;
+    const content = `${instructionPrompt}\nFunction: ${f}\n${exampleInput}---\nInputs:\nArgs: ${argsString}\nOutput:${inputToken}`;
+    return content
   }
 
   /**

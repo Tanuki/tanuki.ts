@@ -123,7 +123,7 @@ export class PatchFunctionCompiler {
     if (!this.doesFileContainPatchFunctions(file)) {
       return
     }
-    console.log("Compiling " + file.fileName)
+    console.debug("Compiling " + file.fileName)
     const patchFunctions: FunctionDescription[] = [];
 
     // First, populate type definitions
@@ -158,11 +158,13 @@ export class PatchFunctionCompiler {
       if (this.compiledFunctionNames.indexOf(name) > -1) {
         throw new Error("Function name collision in `"+file.fileName+".\nPlease move `"+name+"` into its own namespace.")
       }
-      console.log(pf.name + " compiled.")
+
       this.compiledFunctionNames.push(pf.name)
     });
 
+
     if (patchFunctions.length > 0) {
+      console.log("Found " + patchFunctions.length + " patched functions in " + file.fileName)
       this.writeToJSON(patchFunctions);
     }
   }
@@ -250,7 +252,6 @@ export class PatchFunctionCompiler {
           types.splice(types.indexOf("null"), 1)
           return {
             oneOf: [{ type: "null"}, { type: 'string', enum: types}],
-            //nullable: true
           }
         }
         return {
@@ -416,16 +417,31 @@ export class PatchFunctionCompiler {
   }
   extractTypeDefinition(type: string, currentScope: ts.Node | null): string {
 
-    if (currentScope && currentScope) {
-      const def = this.findAndResolveType(type, currentScope.getSourceFile())
+    // If the type is a primitive type, return it
+    const primitiveTypes = ['number', 'string', 'boolean', 'null'];
+    if (primitiveTypes.includes(type)) {
+      return type;
+    }
+    /*if (currentScope) {
+      if (type == "ActionItem[]") {
+        console.log("here")
+      }
+      const currentSourceFile = currentScope.getSourceFile();
+      const def = this.findAndResolveType(type, currentSourceFile)
       if (def) {
         return def
       }
-    }
+    }*/
     // Next, try to resolve the type in the current scope
     let definition = currentScope ? this.findAndResolveTypeInScope(type, currentScope) : undefined;
     if (definition) {
       return definition;
+    }
+    if (currentScope) {
+      definition = this.findAndResolveType(type, currentScope.getSourceFile())
+      if (definition) {
+        return definition;
+      }
     }
     for (const sourceFile of this.sourceFiles) {
       const definition = this.findAndResolveType(type, sourceFile);
@@ -436,6 +452,13 @@ export class PatchFunctionCompiler {
     return type;
   }
 
+  /**
+   * Takes in the string representation of a Typescript type, and attempts to resolve
+   * into a string representation of type definition composed of primitive types by
+   * searching through the scope node.
+   * @param inputType The string representation of a Typescript type.
+   * @param scopeNode The scope node to search for the type definition.
+   */
   findAndResolveTypeInScope(
     inputType: string,
     scopeNode: ts.Node
@@ -469,12 +492,24 @@ export class PatchFunctionCompiler {
           this.resolveType(member, typeAliases, interfaces, enums)
         );
         resolvedType = this.renderEnum(members);
+      } else if (this.ts.isClassDeclaration(node) && node.name && inputType === node.name.text) {
+        const members = node.members.map(member =>
+          this.resolveClassMember(member, typeAliases, interfaces, enums)
+        );
+        resolvedType = this.renderInterface(members);
       }
     });
 
     return resolvedType;
   }
 
+  /**
+   * Takes in the string representation of a Typescript type, and attempts to resolve
+   * into a string representation of type definition composed of primitive types by
+   * searching through the source file.
+   * @param inputType
+   * @param sourceFile
+   */
   findAndResolveType(
     inputType: string,
     sourceFile: ts.SourceFile
@@ -491,6 +526,11 @@ export class PatchFunctionCompiler {
         interfaces.set(node.name.text, node);
       } else if (this.ts.isEnumDeclaration(node)) {
         enums.set(node.name.text, node);
+      } else if (this.ts.isClassDeclaration(node)) {
+        if (node.name) {
+          // @ts-ignore
+          typeAliases.set(node.name.text, node);
+        }
       }
     });
 
@@ -515,6 +555,15 @@ export class PatchFunctionCompiler {
           }
         );
         return this.renderEnum(members);
+      } else if (
+        this.ts.isClassDeclaration(node) &&
+        node.name &&
+        inputType === node.name.text
+      ) {
+        const members = node.members.map(member =>
+          this.resolveClassMember(member, typeAliases, interfaces, enums)
+        );
+        return this.renderInterface(members);
       }
 
     }
@@ -714,6 +763,54 @@ export class PatchFunctionCompiler {
     // TODO: Implement handling for other member types (methods, index signatures, etc.)
 
     return ''; // Fallback for unhandled member types
+  }
+  resolveClassMember(
+    member: ts.ClassElement,
+    typeAliases: Map<string, ts.TypeNode>,
+    interfaces: Map<string, ts.InterfaceDeclaration>,
+    enums: Map<string, ts.EnumDeclaration>,
+    concreteTypes: Map<string, string> = new Map()
+  ): string {
+    if (this.ts.isPropertyDeclaration(member)) {
+      // Handle property declarations
+      const propertyName = member.name.getText();
+      let propertyType = 'any'; // Default type
+
+      if (member.type) {
+        const memberTypeName = member.type.getText();
+        // Resolve property type similar to resolveTypeMember
+        propertyType = this.resolveType(
+          member.type,
+          typeAliases,
+          interfaces,
+          enums,
+          concreteTypes
+        );
+      }
+
+      return `${propertyName}: ${propertyType}`;
+    } else if (this.ts.isMethodDeclaration(member)) {
+      // Handle method declarations
+      const methodName = member.name.getText();
+      let returnType = 'void'; // Default return type
+
+      if (member.type) {
+        returnType = this.resolveType(
+          member.type,
+          typeAliases,
+          interfaces,
+          enums,
+          concreteTypes
+        );
+      }
+
+      // Assuming we don't handle parameters in this example
+      return `${methodName}(): ${returnType}`;
+    }
+
+    // TODO: Implement handling for other class member types
+
+    return ''; // Fallback for unhandled class member types
   }
 
   resolveConcreteType(
@@ -938,6 +1035,7 @@ export default function (program: ts.Program, pluginConfig: PluginConfig, { ts: 
     //const tanuki = new Tanuki();
     return (sourceFile: ts.SourceFile) => {
       compiler.compile(sourceFile);
+
 
       function visit(node: ts.Node): ts.Node {
         return tsInstance.visitEachChild(node, visit, ctx);

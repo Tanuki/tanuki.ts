@@ -1,8 +1,9 @@
 import {
   DEFAULT_DISTILLED_MODEL_NAME,
-  DEFAULT_GENERATIVE_MODELS, DISTILLED_MODEL,
+  DEFAULT_TEACHER_MODELS, DISTILLED_MODEL,
   LLAMA_BEDROCK_PROVIDER,
   OPENAI_PROVIDER, TEACHER_MODEL,
+  DEFAULT_STUDENT_MODELS,
   TITAN_BEDROCK_PROVIDER
 } from "../../constants";
 import { LlamaBedrockConfig } from "./llamaConfig";
@@ -51,16 +52,16 @@ export class ModelConfigFactory {
     if (typeof inputConfig === 'string') {
       // Backwards compatibility
       if (type === DISTILLED_MODEL) {
-        const config = DEFAULT_GENERATIVE_MODELS[DEFAULT_DISTILLED_MODEL_NAME]; // Update as needed
+        const config = DEFAULT_STUDENT_MODELS[DEFAULT_DISTILLED_MODEL_NAME]; // Update as needed
         config.modelName = inputConfig;
         return config;
       } else if (type === TEACHER_MODEL) {
         // @ts-ignore
-        if (!DEFAULT_GENERATIVE_MODELS[inputConfig]) {
+        if (!DEFAULT_TEACHER_MODELS[inputConfig]) {
           throw new Error("Error loading the teacher model, saved config model was saved a string but is not a default model");
         }
         // @ts-ignore
-        return DEFAULT_GENERATIVE_MODELS[inputConfig];
+        return DEFAULT_TEACHER_MODELS[inputConfig];
       }
     } else {
       switch (inputConfig.provider) {

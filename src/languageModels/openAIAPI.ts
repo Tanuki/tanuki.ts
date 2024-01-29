@@ -6,7 +6,7 @@ import { FinetuneJob } from '../models/finetuneJob';
 //import { CreateEmbeddingResponse, FineTuning } from "openai/resources";
 import { Readable } from 'stream';
 import { OpenAIConfig } from "./llmConfigs/openAIConfig";
-import { DEFAULT_DISTILLED_MODEL_NAME, DEFAULT_GENERATIVE_MODELS } from "../constants";
+import { DEFAULT_DISTILLED_MODEL_NAME, DEFAULT_STUDENT_MODELS, DEFAULT_TEACHER_MODELS } from "../constants";
 import { BaseModelConfig } from "./llmConfigs/baseModelConfig";
 import CreateEmbeddingResponse = OpenAI.CreateEmbeddingResponse;
 import { FineTuning, FineTuningJob } from "openai/resources/fine-tuning";
@@ -118,10 +118,12 @@ export class OpenAIAPI implements EmbeddingAPI<number>, LLMApi{
     };
 
     let retryCount = 0;
+    let choice;
     while (retryCount <= maxRetries) {
       try {
         const completion = await this.client.chat.completions.create(params);
-        return completion?.choices[0]?.message?.content?.trim() || '';
+        choice = completion?.choices[0]?.message?.content?.trim() || '';
+        break;
       } catch (error: any) {
         if (error &&
             error instanceof PermissionDeniedError ||
@@ -141,9 +143,22 @@ export class OpenAIAPI implements EmbeddingAPI<number>, LLMApi{
       }
     }
 
-    throw new Error(
-      'OpenAI API failed to generate a response after maximum retries'
-    );
+    if (!choice) {
+      throw new Error(
+        'OpenAI API failed to generate a response'
+      );
+    }
+
+    if (model.parsingHelperTokens?.endToken) {
+      //Remove the end token from the choice
+      choice = choice.split(model.parsingHelperTokens.endToken)[0];
+      //Check if the start token is present in the choice
+      if (choice.includes(model.parsingHelperTokens.startToken)) {
+        //Remove everything before the start token
+        choice = choice.split(model.parsingHelperTokens.startToken)[1];
+      }
+    }
+    return choice.trim();
   }
 
   public async listFinetuned(limit = 100): Promise<FinetuneJob[]> {
@@ -172,7 +187,7 @@ export class OpenAIAPI implements EmbeddingAPI<number>, LLMApi{
     return job;
   }
   private createFinetuneJob(response: FineTuningJobResponse): FinetuneJob {
-    const modelConfig = JSON.parse(JSON.stringify(DEFAULT_GENERATIVE_MODELS[DEFAULT_DISTILLED_MODEL_NAME]));
+    const modelConfig = JSON.parse(JSON.stringify(DEFAULT_STUDENT_MODELS[DEFAULT_DISTILLED_MODEL_NAME]));
     modelConfig.model_name = response.fineTunedModel ?? 'Not Available'; // Handle null case
 
     return new FinetuneJob(response.id, response.status, modelConfig);
@@ -196,11 +211,11 @@ export class OpenAIAPI implements EmbeddingAPI<number>, LLMApi{
       // Start fine-tuning
       const finetuningResponse: FineTuningJob = await this.client.fineTuning.jobs.create({
         training_file: fileUploadResponse.id,
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-3.5-turbo-1106',
         suffix: suffix
       });
 
-      const finetunedModelConfig = JSON.parse(JSON.stringify(DEFAULT_GENERATIVE_MODELS[DEFAULT_DISTILLED_MODEL_NAME]));
+      const finetunedModelConfig = JSON.parse(JSON.stringify(DEFAULT_STUDENT_MODELS[DEFAULT_DISTILLED_MODEL_NAME]));
       finetunedModelConfig.model_name = finetuningResponse.fine_tuned_model ?? 'Not Available'; // Handle null case
 
       return new FinetuneJob(finetuningResponse.id, finetuningResponse.status, finetunedModelConfig);

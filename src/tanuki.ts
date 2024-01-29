@@ -227,7 +227,7 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
       const functionDescription: FunctionDescription = Register.loadFunctionDescription(functionName, docstring);
       let embeddingCase = false;
       if (config) {
-        FunctionModeler.setConfig(functionDescription.hash(), config);
+        FunctionModeler.setConfig(functionDescription, config);
         functionModeler.loadSymbolicAlignStatements(functionDescription.hash());
       }
 

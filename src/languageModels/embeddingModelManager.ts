@@ -8,30 +8,34 @@ import { DEFAULT_EMBEDDING_MODEL_NAME, DEFAULT_EMBEDDING_MODELS } from "../const
 class EmbeddingModelManager<T> {
   private functionModeler: FunctionModeler; // Replace 'any' with the actual type of your FunctionModeler
   private apiManager: APIManager
-  private currentGenerators: Record<string, string>;
+  private initializedFunctions: Map<string, any>;
 
   constructor(functionModeler: any, apiManager: APIManager) {
     this.functionModeler = functionModeler;
     this.apiManager = apiManager;
-    this.currentGenerators = {};
+    this.initializedFunctions = new Map<string, any>();
   }
 
   private getEmbeddingCase(input: any, functionDescription: FunctionDescription, examples?: any): (string | any)[] {
     const content = `Name: ${functionDescription.name}\nArgs: ${JSON.stringify(input)}`;
-    const functionHash = functionDescription.hash();
+    const funcHash = functionDescription.hash();
     let model = null;
-    if (functionHash in FunctionModeler.teacherModelsOverride) {
-      model = FunctionModeler.teacherModelsOverride[functionHash][0];
+    if (funcHash in FunctionModeler.teacherModelsOverride) {
+      model = FunctionModeler.teacherModelsOverride[funcHash][0];
     } else {
       model = DEFAULT_EMBEDDING_MODELS[DEFAULT_EMBEDDING_MODEL_NAME]
     }
 
-    if (!(functionHash in this.currentGenerators)) {
-      console.info(`Generating function embeddings with ${functionHash}`);
-      this.currentGenerators[functionHash] = model.modelName;
-    } else if (this.currentGenerators[functionHash] !== model.modelName) {
-      console.info(`Switching function embeddings from ${this.currentGenerators[functionHash]} to ${model.modelName}`);
-      this.currentGenerators[functionHash] = model.modelName;
+    let currentGenerator = this.initializedFunctions.get(funcHash);
+    if (currentGenerator) {
+      let generatorModel = currentGenerator.model;
+      if (generatorModel === "") {
+        console.info(`Found ${currentGenerator.examples.length} align statements for ${functionDescription.name}. Generating function outputs with ${model.modelName}.`);
+        this.initializedFunctions.set(funcHash, { ...currentGenerator, model: model.modelName });
+      } else if (generatorModel !== model.modelName) {
+        console.info(`Switching output generation from ${generatorModel} to ${model.modelName} for function ${functionDescription.name}.`);
+        this.initializedFunctions.set(funcHash, { ...currentGenerator, model: model.modelName });
+      }
     }
     return [content, model];
   }

@@ -11,7 +11,7 @@ import { FunctionExample } from '../models/functionExample';
 import { IDatasetWorker } from './IDatasetWorker';
 import { FunctionConfig } from "../models/functionConfig";
 import {
-  ALIGN_FILE_EXTENSION, DEFAULT_DISTILLED_MODEL_NAME, DEFAULT_GENERATIVE_MODELS, DEFAULT_TEACHER_MODEL_NAMES,
+  ALIGN_FILE_EXTENSION, DEFAULT_DISTILLED_MODEL_NAME, DEFAULT_TEACHER_MODELS, DEFAULT_TEACHER_MODEL_NAMES,
   EXPECTED_ITEMS,
   FALSE_POSITIVE_RATE,
   NEGATIVE_FILE_EXTENSION,
@@ -34,13 +34,13 @@ abstract class AbstractBufferedLogger implements IDatasetWorker {
 
   // Default configuration for FunctionConfig
   defaultFunctionConfig: FunctionConfig = {
-    distilledModel: DEFAULT_GENERATIVE_MODELS[DEFAULT_DISTILLED_MODEL_NAME],
+    distilledModel: DEFAULT_TEACHER_MODELS[DEFAULT_DISTILLED_MODEL_NAME],
     currentModelStats: { trainedOnDatapoints: 0, runningFaults: [] },
     lastTrainingRun: { jobId: '', trainedOnDatapoints: 0, lastChecked: '' },
     currentTrainingRun: { jobId: '', trainedOnDatapoints: 0, lastChecked: '' },
     teacherModels: DEFAULT_TEACHER_MODEL_NAMES.map(teacherModelName => {
       // @ts-ignore
-      return DEFAULT_GENERATIVE_MODELS[teacherModelName];
+      return DEFAULT_TEACHER_MODELS[teacherModelName];
     }),
     nrOfTrainingRuns: 0,
   };

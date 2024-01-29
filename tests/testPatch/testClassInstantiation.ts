@@ -11,9 +11,11 @@ class ActionItem {
   }
 }
 
+type ActionItemType = ActionItem;
+
 // Assuming we have a similar setup for the patch and align methods
 class Functions {
-  actionItems = patch<ActionItem[], string>()`Generate a list of Action Items`;
+  actionItems = patch<ActionItemType[], string>()`Generate a list of Action Items`;
 }
 
 describe('Instantiate Class Tests', () => {
@@ -27,7 +29,7 @@ describe('Instantiate Class Tests', () => {
         nextTuesday.setDate(nextTuesday.getDate() + ((1 - nextTuesday.getDay() + 7) % 7));
         nextTuesday.setHours(0, 0, 0, 0);
 
-        const expectedActionItem = new ActionItem("Prepare the presentation", nextTuesday);
+        const expectedActionItem: ActionItemType = new ActionItem("Prepare the presentation", nextTuesday);
         const result = await new Functions().actionItems(goal);
 
         // Assuming the result is an array of ActionItems
@@ -42,7 +44,7 @@ describe('Instantiate Class Tests', () => {
       nextWednesday.setDate(nextWednesday.getDate() + ((1 - nextWednesday.getDay() + 7) % 7));
       nextWednesday.setHours(0, 0, 0, 0);
 
-      const expectedActionItem = new ActionItem("Prepare the presentation", nextWednesday);
+      const expectedActionItem: ActionItemType = new ActionItem("Prepare the presentation", nextWednesday);
       const result = await new Functions().actionItems(goal);
 
       // Assuming the result is an array of ActionItems

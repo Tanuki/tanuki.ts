@@ -15,6 +15,7 @@ export class BaseModelConfig {
 
   constructor(config: {
     modelName: string,
+    instructions?: string,
     provider: string,
     contextLength: number,
     chatTemplate?: string,
@@ -28,6 +29,7 @@ export class BaseModelConfig {
     this.contextLength = config.contextLength;
     this.chatTemplate = config.chatTemplate;
     this.parsingHelperTokens = config.parsingHelperTokens || {startToken: "", endToken: ""};
+    this.instructions = config.instructions || this.instructions;
   }
 
   // Additional methods can be added here

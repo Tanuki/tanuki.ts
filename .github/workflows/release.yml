@@ -1,16 +1,41 @@
-# Reusable workflow for releases; to eject, you can replace this file with
-# https://github.com/ryansonshine/ryansonshine/blob/main/.github/workflows/release.yml
 name: Release
+
 on:
-  push:
-    branches:
-      - main
-jobs:
   release:
-    permissions:
-      contents: write
-      issues: write
-      pull-requests: write
-    uses: ryansonshine/ryansonshine/.github/workflows/release.yml@main
-    secrets:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      node_version:
+        description: 'Node.js Version'
+        required: true
+        default: '14'
+      release_version:
+        description: 'Release Version'
+        required: true
+
+jobs:
+  npm-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ github.event.inputs.node_version }}
+          registry-url: 'https://registry.npmjs.org/'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build # assuming you have a build script in your package.json
+
+      - name: Update package version
+        run: npm version ${{ github.event.inputs.release_version }} --no-git-tag-version
+
+      - name: Publish package
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

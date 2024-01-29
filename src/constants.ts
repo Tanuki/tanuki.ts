@@ -34,7 +34,7 @@ export const ENVVAR = 'TANUKI_LOG_DIR';
 
 // default models
 export const DEFAULT_TEACHER_MODEL_NAMES = ["gpt-4", "gpt-4-32k", ]
-export const DEFAULT_DISTILLED_MODEL_NAME = "gpt-3.5-finetune"
+export const DEFAULT_DISTILLED_MODEL_NAME = "gpt-3.5-turbo-1106"
 export const DEFAULT_EMBEDDING_MODEL_NAME = "ada-002"
 
 // provider names
@@ -46,16 +46,27 @@ export const TITAN_BEDROCK_PROVIDER = "aws_titan_bedrock"
 // model type strings
 export const TEACHER_MODEL = "teacher"
 export const DISTILLED_MODEL = "distillation"
-export const DEFAULT_GENERATIVE_MODELS = {
+export const DEFAULT_TEACHER_MODELS = {
   "gpt-4-1106-preview": new OpenAIConfig({modelName: "gpt-4-1106-preview", contextLength: 128000}),
   "gpt-4": new OpenAIConfig({modelName: "gpt-4", contextLength: 8192}),
   "gpt-4-32k": new OpenAIConfig({modelName: "gpt-4-32k", contextLength: 32768}),
-  "gpt-3.5-finetune": new OpenAIConfig({modelName: "", contextLength: 3000}),
+  "gpt-4-turbo": new OpenAIConfig({modelName: "gpt-4-1106-preview",
+    contextLength: 128000,
+    instructions: "You are given below a function description and input data. The function description of what the function must carry out can be found in the Function section, with input and output type hints. The input data can be found in Input section. Using the function description, apply the function to the Input and return a valid output type, that is acceptable by the output_class_definition and output_class_hint.\nINCREDIBLY IMPORTANT: Only output a JSON-compatible string in the correct response format. Use the [END] tokens to specify when the output ends.",
+    parsingHelperTokens: {startToken: "[START]", endToken: "[END]"}}),
+  "gpt-4-turbo-0125": new OpenAIConfig({modelName: "gpt-4-0125-preview",
+    contextLength: 128000,
+    instructions: "You are given below a function description and input data. The function description of what the function must carry out can be found in the Function section, with input and output type hints. The input data can be found in Input section. Using the function description, apply the function to the Input and return a valid output type, that is acceptable by the output_class_definition and output_class_hint.\nINCREDIBLY IMPORTANT: Only output a JSON-compatible string in the correct response format. Use the [END] tokens to specify when the output ends.",
+    parsingHelperTokens: {startToken: "[START]", endToken: "[END]"}}),
+  "gpt-3.5-turbo-1106-finetune": new OpenAIConfig({modelName: "", contextLength: 14000}),
   "anthropic.claude-v2:1": new ClaudeConfig({modelName: "anthropic.claude-v2:1", contextLength: 200000}),
   "llama_70b_chat_aws": new LlamaBedrockConfig({modelName: "meta.llama2-70b-chat-v1", contextLength: 4096}),
   "llama_13b_chat_aws": new LlamaBedrockConfig({modelName: "meta.llama2-13b-chat-v1", contextLength: 4096}),
 }
 
+export const DEFAULT_STUDENT_MODELS = {
+  "gpt-3.5-turbo-1106": new OpenAIConfig({modelName: "", contextLength: 14000}),
+}
 
 export const DEFAULT_EMBEDDING_MODELS = {
   "ada-002": new OpenAIConfig({modelName:"text-embedding-ada-002", contextLength:8191}),
