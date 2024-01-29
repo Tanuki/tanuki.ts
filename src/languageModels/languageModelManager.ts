@@ -76,7 +76,8 @@ export class LanguageModelManager {
     const output: LanguageModelOutput = await this.generate(
       args,
       functionDescription,
-      generationParameters
+      generationParameters,
+      functionDescription.hash()
     );
 
     const choiceParsed = this.parseChoice(output);
@@ -86,7 +87,7 @@ export class LanguageModelManager {
     );
 
     if (!isValid) {
-      const { choice, choiceParsed, successfulRepair } =
+      const { choice, successfulRepair } =
         await this.repairOutput(
           args,
           functionDescription,
@@ -142,7 +143,7 @@ export class LanguageModelManager {
   private async generate(
     args: any,
     functionDescription: FunctionDescription,
-    llmParameters: Record<string, any> = {}
+    llmParameters: Record<string, any> = {},
     funcHash: string
   ): Promise<LanguageModelOutput> {
     //const funcHash = functionDescription.hash();
