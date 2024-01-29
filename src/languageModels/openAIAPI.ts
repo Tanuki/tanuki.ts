@@ -211,7 +211,7 @@ export class OpenAIAPI implements EmbeddingAPI<number>, LLMApi{
       // Start fine-tuning
       const finetuningResponse: FineTuningJob = await this.client.fineTuning.jobs.create({
         training_file: fileUploadResponse.id,
-        model: 'gpt-3.5-turbo-1106',
+        model: DEFAULT_DISTILLED_MODEL_NAME,
         suffix: suffix
       });
 

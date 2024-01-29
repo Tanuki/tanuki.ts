@@ -16,7 +16,7 @@ import {
   FALSE_POSITIVE_RATE,
   NEGATIVE_FILE_EXTENSION,
   PATCH_FILE_EXTENSION,
-  POSITIVE_FILE_EXTENSION
+  POSITIVE_FILE_EXTENSION, DEFAULT_STUDENT_MODELS
 } from "../constants";
 import { ModelConfigFactory } from "../languageModels/llmConfigs/modelConfigFactory";
 //import { FunctionConfig } from "../models/functionConfig";
@@ -34,7 +34,7 @@ abstract class AbstractBufferedLogger implements IDatasetWorker {
 
   // Default configuration for FunctionConfig
   defaultFunctionConfig: FunctionConfig = {
-    distilledModel: DEFAULT_TEACHER_MODELS[DEFAULT_DISTILLED_MODEL_NAME],
+    distilledModel: DEFAULT_STUDENT_MODELS[DEFAULT_DISTILLED_MODEL_NAME],
     currentModelStats: { trainedOnDatapoints: 0, runningFaults: [] },
     lastTrainingRun: { jobId: '', trainedOnDatapoints: 0, lastChecked: '' },
     currentTrainingRun: { jobId: '', trainedOnDatapoints: 0, lastChecked: '' },
