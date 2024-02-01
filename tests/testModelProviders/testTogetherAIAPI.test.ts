@@ -6,7 +6,7 @@ class TogetherSentimentClassifier {
         generationParams: {
             "max_new_tokens": 10,
         }
-    })`Determine if the inputs are positive or negative sentiment, or None`;
+    })`Given a pair of inputs, derive ONE sentiment value. Either positive or negative sentiment, or null`;
 
     static classifySentiment = patch<"Good" | "Bad" | null, string>({
         teacherModels: ["openchat-3.5"],

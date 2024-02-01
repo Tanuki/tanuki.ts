@@ -106,6 +106,7 @@ export class TogetherAIAPI implements LLMApi, LLMFinetuneAPI {
                               frequencyPenalty?: number;
                               presencePenalty?: number;
                               maxNewTokens?: number;
+                              stop?: string;
                           } = {},): Promise<string> {
         this.checkApiKey();
 
@@ -116,14 +117,27 @@ export class TogetherAIAPI implements LLMApi, LLMFinetuneAPI {
             this.modelConfigs[model.modelName] = await this.fetchModelInfo(model.modelName);
         }
 
-        const generationParams = {
+        const generationParams: {
+            temperature: number;
+            topP: number;
+            repetition_penalty: number;
+            presencePenalty: number;
+            maxNewTokens?: number;
+            stop?: string[];
+        } = {
             temperature: kwargs.temperature || 0.1,
             topP: kwargs.topP || 1,
             repetition_penalty: kwargs.frequencyPenalty || 0,
             presencePenalty: kwargs.presencePenalty || 0,
-            maxNewTokens: kwargs.maxNewTokens
+            maxNewTokens: kwargs.maxNewTokens,
         };
 
+        if ("stop" in this.modelConfigs[model.modelName].config) {
+            generationParams.stop = this.modelConfigs[model.modelName].config.stop;
+        }
+        if (model.parsingHelperTokens?.endToken) {
+            generationParams.stop = [model.parsingHelperTokens.endToken];
+        }
         const unsupportedParams = Object.keys(kwargs).filter(param => !LLM_GENERATION_PARAMETERS.includes(param));
         if (unsupportedParams.length > 0) {
             console.warn(`Unused generation parameters sent as input: ${unsupportedParams}. Only the following parameters are supported: ${LLM_GENERATION_PARAMETERS}`);
@@ -172,7 +186,12 @@ export class TogetherAIAPI implements LLMApi, LLMFinetuneAPI {
 
         if (model.parsingHelperTokens.endToken) {
             //remove the end token from the choice
-            choice = choice.split(model.parsingHelperTokens.endToken)[0];
+            const choiceParts = choice.split(model.parsingHelperTokens.endToken);
+            if (choiceParts.length > 1) {
+                choice = choiceParts[0];
+            } else {
+                return choice;
+            }
             //check if the start token is present in the choice
             if (choice.includes(model.parsingHelperTokens.startToken)) {
                 const parts = choice.split(model.parsingHelperTokens.startToken);
@@ -226,10 +245,14 @@ export class TogetherAIAPI implements LLMApi, LLMFinetuneAPI {
                 authorization: `Bearer ${this.apiKey}`
             }
         });
-        const modelList = await info.json();
+        try {
+            const modelList = await info.json();
 
-        // Get the model configuration by iterating over the modelList and filtering by name
-        return modelList.filter((model: any) => model.name === modelName)[0];
+            // Get the model configuration by iterating over the modelList and filtering by name
+            return modelList.filter((model: any) => model.name === modelName)[0];
+        } catch (error) {
+            throw new Error(`TogetherAI API failed to fetch model info. Is your API key correct?`);
+        }
     }
 
     finetune(...args: any[]): Promise<FinetuneJob> {
