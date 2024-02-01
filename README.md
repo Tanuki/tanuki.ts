@@ -84,6 +84,12 @@ export AWS_SECRET_ACCESS_KEY=...
 export AWS_ACCESS_KEY_ID=...
 ```
 
+Next, we need to install the Tanuki type transformer. This will allow Tanuki to be aware of your patched functions and types at runtime, as these types are usually erased by the Typescript compiler when transpiling into Javascript.
+```typescript
+npm install ts-patch --save-dev
+npx ts-patch install
+```
+
 Next, you need to add the Tanuki transformer to your `tsconfig.json` file:
 
 ```json

@@ -46,9 +46,11 @@ export interface JSONSchema {
   [key: string]: any;
 }
 
-class FunctionDescription {
+class CompiledFunctionDescription {
   name: string;
   docstring: string;
+  parentName?: string;
+  sourceFile?: string;
   inputTypeDefinition?: string
   inputTypeSchema?: JSONSchema;
   outputTypeDefinition?: string;
@@ -58,6 +60,8 @@ class FunctionDescription {
   constructor(
     name: string,
     docstring: string,
+    parentName?: string,
+    sourceFile?: string,
     inputTypeDefinition?: string,
     outputTypeDefinition?: string,
     inputTypeSchema?: JSONSchema,
@@ -66,6 +70,12 @@ class FunctionDescription {
   ) {
     this.name = name;
     this.docstring = docstring;
+    if (parentName != undefined) {
+      this.parentName = parentName;
+    }
+    if (sourceFile != undefined) {
+      this.sourceFile = sourceFile;
+    }
     if (inputTypeDefinition != null) {
       this.inputTypeDefinition = inputTypeDefinition;
     }
@@ -124,7 +134,7 @@ export class PatchFunctionCompiler {
       return
     }
     console.debug("Compiling " + file.fileName)
-    const patchFunctions: FunctionDescription[] = [];
+    const patchFunctions: CompiledFunctionDescription[] = [];
 
     // First, populate type definitions
     this.ts.forEachChild(file, node => this.extractTypeDefinitions(node));
@@ -154,10 +164,10 @@ export class PatchFunctionCompiler {
         pf.name,
         inputTypeDefinitionTokenStream
       );
-      const name = pf.name
+      /*const name = pf.name
       if (this.compiledFunctionNames.indexOf(name) > -1) {
-        throw new Error("Function name collision in `"+file.fileName+".\nPlease move `"+name+"` into its own namespace.")
-      }
+        throw new Error("Function name collision in `"+file.fileName+".\nPlease move `"+name+"` into its own namespace. Tanuki functions have to be unique across all files. ")
+      }*/
 
       this.compiledFunctionNames.push(pf.name)
     });
@@ -290,7 +300,7 @@ export class PatchFunctionCompiler {
     }
     this.ts.forEachChild(node, child => this.extractTypeDefinitions(child));
   }
-  visit(node: ts.Node, patchFunctions: FunctionDescription[], file: ts.SourceFile): void {
+  visit(node: ts.Node, patchFunctions: CompiledFunctionDescription[], file: ts.SourceFile): void {
     if (this.ts.isClassDeclaration(node) || this.ts.isModuleDeclaration(node)) {
       const previousClassOrModule = this.currentClassOrModule;
       this.currentClassOrModule = node;
@@ -337,7 +347,7 @@ export class PatchFunctionCompiler {
     functionName: string,
     file: ts.SourceFile,
     currentClassOrModule: ts.ClassDeclaration | ts.ModuleDeclaration | null
-  ): FunctionDescription | null {
+  ): CompiledFunctionDescription | null {
     if (
       this.ts.isPropertyDeclaration(node) &&
       node.initializer &&
@@ -347,7 +357,7 @@ export class PatchFunctionCompiler {
       let parent = '';
       if (node.parent && node.parent.name && this.ts.isClassDeclaration(node.parent)) {
         if (node.parent.name.getText() === 'Function') {
-            throw new Error("Tanuki functions cannot live in an class called `Function`");
+            throw new Error("The class `Function` cannot have patched functions as members, as this is a reserved word. You could rename the class.")
         }
         // @ts-ignore
         parent = node.parent.name.getText() + ".";
@@ -372,7 +382,7 @@ export class PatchFunctionCompiler {
       }
       const staticFlag = isNodeStatic(node);
 
-      let name = staticFlag ? functionName : parent+functionName; // Use the passed function name
+      let name = functionName; // Use the passed function name
 
       const docstringWithTicks = node.initializer.template.getText();
       const docstring = docstringWithTicks.replace(/`/g, '');
@@ -384,20 +394,24 @@ export class PatchFunctionCompiler {
         const outputTypeNode: ts.Node = typeArguments[0];
         const inputTypeNode: ts.Node = typeArguments[1];
 
-        const inputType = inputTypeNode.getText(); // Get the textual representation of the input type
-        const outputType = outputTypeNode.getText(); // Get the textual representation of the output type
+        const inputType = inputTypeNode.getText(file); // Get the textual representation of the input type
+        const outputType = outputTypeNode.getText(file); // Get the textual representation of the output type
 
         const current = this.currentClassOrModule
-        const inputTypeDefinition = this.extractTypeDefinition(inputType, current);
-        const outputTypeDefinition = this.extractTypeDefinition(outputType, current);
+        const inputTypeDefinition = this.extractTypeDefinition(inputType, current, file);
+        const outputTypeDefinition = this.extractTypeDefinition(outputType, current, file);
 
         const type = !outputTypeDefinition.startsWith('Embedding')
           ? FunctionType.SYMBOLIC
           : FunctionType.EMBEDDABLE;
         //name = current?.name?.getText() + "." + name
-        return new FunctionDescription(
+        // @ts-ignore
+        let parentName = current.name.getText()
+        return new CompiledFunctionDescription(
           name,
           docstring,
+          parentName,
+          file.fileName,
           inputTypeDefinition,
           outputTypeDefinition,
           undefined,
@@ -415,7 +429,7 @@ export class PatchFunctionCompiler {
 
     return null;
   }
-  extractTypeDefinition(type: string, currentScope: ts.Node | null): string {
+  extractTypeDefinition(type: string, currentScope: ts.Node | null, file: SourceFile): string {
 
     // If the type is a primitive type, return it
     const primitiveTypes = ['number', 'string', 'boolean', 'null'];
@@ -438,7 +452,7 @@ export class PatchFunctionCompiler {
       return definition;
     }
     if (currentScope) {
-      definition = this.findAndResolveType(type, currentScope.getSourceFile())
+      definition = this.findAndResolveType(type, file)
       if (definition) {
         return definition;
       }
@@ -943,7 +957,7 @@ export class PatchFunctionCompiler {
     return hasPatch;
   }
 
-  writeToJSON(patchFunctions: FunctionDescription[]): void {
+  writeToJSON(patchFunctions: CompiledFunctionDescription[]): void {
     // Determine the output directory
     const distDirectory = PatchFunctionCompiler.getDistDirectory();
 

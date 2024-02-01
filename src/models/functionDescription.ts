@@ -5,6 +5,8 @@ import { JSONSchema } from './jsonSchema';
 class FunctionDescription {
   name: string;
   docstring: string;
+  parentName?: string;
+  sourceFile?: string;
   inputTypeDefinition?: string
   inputTypeSchema?: JSONSchema;
   outputTypeDefinition?: string;
@@ -14,6 +16,8 @@ class FunctionDescription {
   constructor(
     name: string,
     docstring: string,
+    parentName?: string,
+    sourceFile?: string,
     inputTypeDefinition?: string,
     outputTypeDefinition?: string,
     inputTypeSchema?: JSONSchema,
@@ -22,6 +26,12 @@ class FunctionDescription {
   ) {
     this.name = name;
     this.docstring = docstring;
+    if (parentName != null) {
+      this.parentName = parentName;
+    }
+    if (sourceFile != null) {
+      this.sourceFile = sourceFile;
+    }
     if (inputTypeDefinition != null) {
       this.inputTypeDefinition = inputTypeDefinition;
     }

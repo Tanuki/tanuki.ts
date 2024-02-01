@@ -222,9 +222,12 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
     }
 
     // Return a function that takes an input of type InputType and returns a value of type OutputType
-    return async (input: InputType): Promise<OutputType> => {
-      const functionName: string = getCallerInfo(Register.getNamedFunctions());
-      const functionDescription: FunctionDescription = Register.loadFunctionDescription(functionName, docstring);
+    return async function(this: any, input: InputType): Promise<OutputType> {
+      const parentClass = this;
+      const functionDescription = Register.getNamedFunctions(parentClass, docstring);
+      //const functionName: string = getCallerInfo(namedFunctions);
+      //const functionName: string = foundFunction.name
+      //const functionDescription: FunctionDescription = Register.loadFunctionDescription(functionName, docstring);
       let embeddingCase = false;
       if (config) {
         FunctionModeler.setConfig(functionDescription, config);

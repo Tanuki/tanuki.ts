@@ -10,6 +10,8 @@ import { REGISTERED_FUNCTIONS_FILENAME } from "./constants";
 interface FunctionDescriptionJSON {
   name: string;
   docstring: string;
+  parentName?: string;
+  sourceFile?: string;
   inputTypeDefinition: string;
   outputTypeDefinition: string;
   inputTypeSchema: JSONSchema;
@@ -79,6 +81,8 @@ export class Register {
       const pf = new FunctionDescription(
         pfj.name,
         pfj.docstring,
+        pfj.parentName,
+        pfj.sourceFile,
         undefined,
         undefined,
         pfj.inputTypeSchema,
@@ -165,8 +169,53 @@ export class Register {
     return functionDescription;
     throw new Error("Method not implemented.");
   }*/
-  static getNamedFunctions(): string[] {
-    return [...Object.keys(this.alignableSymbolicFunctions), ...Object.keys(this.alignableEmbeddingFunctions)];
+  // @ts-ignore
+  static getNamedFunctions(classContext, docstring: string): FunctionDescription {
+    const className = classContext.name;
+    const classPrefix = className + '.';
+
+    // Gather all function names from alignable functions
+    const allFunctionNames = [
+      ...Object.keys(this.alignableSymbolicFunctions),
+      ...Object.keys(this.alignableEmbeddingFunctions)
+    ];
+
+    const filterFunctions = (functions: { // @ts-ignore
+      [p: string]: FunctionDescription }) => {
+      return Object.values(functions)
+          .filter(funcDesc => funcDesc.parentName === classContext.name)
+          .filter(funcDesc => docstring === "" || funcDesc.docstring === docstring)
+          .map(funcDesc => funcDesc);
+    };
+
+    // Apply the filter to both symbolic and embedding functions
+    const symbolicFunctionNames = filterFunctions(this.alignableSymbolicFunctions);
+    const embeddingFunctionNames = filterFunctions(this.alignableEmbeddingFunctions);
+    const allFunctions = [...symbolicFunctionNames, ...embeddingFunctionNames];
+
+    // If more than one function is found, throw an error
+    if (allFunctions.length > 1) {
+      throw new Error(`Multiple functions with name "${className}" and docstring "${docstring}" found.`);
+    }
+    // If no function is found, throw an error
+    if (allFunctions.length === 0) {
+      throw new Error(`Function with name "${className}" and docstring "${docstring}" not found in class "${classContext.name}". Check source file: "${classContext.sourceFile}"`);
+    }
+    return allFunctions[0]
+
+    // Filter by the members of the classContext
+    // const memberFunctionNames = allFunctionNames.filter(name =>
+    //     typeof classContext[name] === 'function'
+    // );
+    // const symbolicFunctionNames = Object.keys(this.alignableSymbolicFunctions)
+    //     .filter(key => key.startsWith(classPrefix))
+    //     .map(key => key.slice(classPrefix.length)); // Remove the prefix
+    //
+    // const embeddingFunctionNames = Object.keys(this.alignableEmbeddingFunctions)
+    //     .filter(key => key.startsWith(classPrefix))
+    //     .map(key => key.slice(classPrefix.length)); // Remove the prefix
+    //
+    // return [...symbolicFunctionNames, ...embeddingFunctionNames];
   }
   static loadFunctionDescription(functionName: string, docString: string): FunctionDescription {
     // Iterate over alignableSymbolicFunctions
