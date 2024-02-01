@@ -117,3 +117,5 @@ dist
 
 # Compiled code
 lib/
+
+tests/testModelProviders/.env

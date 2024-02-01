@@ -225,9 +225,7 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
     return async function(this: any, input: InputType): Promise<OutputType> {
       const parentClass = this;
       const functionDescription = Register.getNamedFunctions(parentClass, docstring);
-      //const functionName: string = getCallerInfo(namedFunctions);
-      //const functionName: string = foundFunction.name
-      //const functionDescription: FunctionDescription = Register.loadFunctionDescription(functionName, docstring);
+
       let embeddingCase = false;
       if (config) {
         FunctionModeler.setConfig(functionDescription, config);
@@ -268,12 +266,14 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
           validator,
         )) as unknown as OutputType;
       } else {
-        return (await languageModeler.call(
+        const response = (await languageModeler.call(
           input,
           functionDescription,
           validator,
           config.generationParams
         )) as unknown as OutputType;
+
+        return response;
       }
     };
   };

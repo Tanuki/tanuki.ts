@@ -24,7 +24,10 @@ export class LLamaBedrockAPI extends BedrockAPI {
       throw new Error("Chat prompt is not defined for this model. Please define it in the model config");
     }
 
-    const finalPrompt = chatPrompt.replace("{system_message}", systemMessage).replace("{user_prompt}", prompt);
+    let finalPrompt = chatPrompt.replace("{system_message}", systemMessage).replace("{user_prompt}", prompt);
+    if (model.parsingHelperTokens?.startToken) {
+        finalPrompt = finalPrompt + model.parsingHelperTokens.startToken;
+    }
     const body = JSON.stringify({
       prompt: finalPrompt,
       max_gen_len: maxNewTokens,

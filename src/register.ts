@@ -26,8 +26,8 @@ const alignableEmbeddingFunctions: Record<string, Function> = {};
 
 export class Register {
 
-  static alignableSymbolicFunctions: Record<string, FunctionDescription> = {};
-  static alignableEmbeddingFunctions: Record<string, FunctionDescription> = {};
+  static alignableSymbolicFunctions: Record<string, Record<string, FunctionDescription>> = {};
+  static alignableEmbeddingFunctions: Record<string, Record<string, FunctionDescription>> = {};
 
   static loadFunctions() {
     const distDirectory = PatchFunctionCompiler.getDistDirectory();
@@ -90,9 +90,16 @@ export class Register {
         pfj.type ?? FunctionType.SYMBOLIC
       );
       if (pf.type === FunctionType.SYMBOLIC) {
-        this.alignableSymbolicFunctions[pf.name] = pf;
+        // Ensure the parentName key exists in the alignableSymbolicFunctions object
+        if (this.alignableSymbolicFunctions[pf.parentName || ""] == undefined) {
+          this.alignableSymbolicFunctions[pf.parentName || ""] = {};
+        }
+        this.alignableSymbolicFunctions[pf.parentName || ""][pf.name] = pf;
       } else if (pf.type === FunctionType.EMBEDDABLE) {
-        this.alignableEmbeddingFunctions[pf.name] = pf;
+        if (this.alignableEmbeddingFunctions[pf.parentName || ""] == undefined) {
+          this.alignableEmbeddingFunctions[pf.parentName || ""] = {};
+        }
+        this.alignableEmbeddingFunctions[pf.parentName || ""][pf.name] = pf;
       }
     });
   }
@@ -172,21 +179,18 @@ export class Register {
   // @ts-ignore
   static getNamedFunctions(classContext, docstring: string): FunctionDescription {
     const className = classContext.name;
-    const classPrefix = className + '.';
 
-    // Gather all function names from alignable functions
-    const allFunctionNames = [
-      ...Object.keys(this.alignableSymbolicFunctions),
-      ...Object.keys(this.alignableEmbeddingFunctions)
-    ];
+    const filterFunctions = (functions: Record<string, Record<string, FunctionDescription>>) => {
+      // Check if the key exists in the object and is not undefined/null
+      const classFunctions = functions[className || ""] || {};
+      const values = Object.values(classFunctions);
 
-    const filterFunctions = (functions: { // @ts-ignore
-      [p: string]: FunctionDescription }) => {
-      return Object.values(functions)
+      return values
           .filter(funcDesc => funcDesc.parentName === classContext.name)
           .filter(funcDesc => docstring === "" || funcDesc.docstring === docstring)
           .map(funcDesc => funcDesc);
     };
+
 
     // Apply the filter to both symbolic and embedding functions
     const symbolicFunctionNames = filterFunctions(this.alignableSymbolicFunctions);
@@ -217,18 +221,18 @@ export class Register {
     //
     // return [...symbolicFunctionNames, ...embeddingFunctionNames];
   }
-  static loadFunctionDescription(functionName: string, docString: string): FunctionDescription {
+  static loadFunctionDescription(parentName: string, functionName: string, docString: string): FunctionDescription {
     // Iterate over alignableSymbolicFunctions
     for (const key in this.alignableSymbolicFunctions) {
-      if (this.alignableSymbolicFunctions[key].name === functionName && this.alignableSymbolicFunctions[key].docstring.trim() === docString.trim()) {
-        return this.alignableSymbolicFunctions[key];
+      if (this.alignableSymbolicFunctions[parentName][key].name === functionName && this.alignableSymbolicFunctions[parentName][key].docstring.trim() === docString.trim()) {
+        return this.alignableSymbolicFunctions[parentName][key];
       }
     }
 
     // Iterate over alignableEmbeddingFunctions
     for (const key in this.alignableEmbeddingFunctions) {
-      if (this.alignableEmbeddingFunctions[key].name === functionName && this.alignableEmbeddingFunctions[key].docstring.trim() === docString.trim()) {
-        return this.alignableEmbeddingFunctions[key];
+      if (this.alignableEmbeddingFunctions[parentName][key].name === functionName && this.alignableEmbeddingFunctions[parentName][key].docstring.trim() === docString.trim()) {
+        return this.alignableEmbeddingFunctions[parentName][key];
       }
     }
     // If no match is found

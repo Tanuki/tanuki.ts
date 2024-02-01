@@ -2,7 +2,7 @@ import { OpenAIConfig } from "./languageModels/llmConfigs/openAIConfig";
 import { ClaudeConfig } from "./languageModels/llmConfigs/claudeConfig";
 import { LlamaBedrockConfig } from "./languageModels/llmConfigs/llamaConfig";
 import { TitanBedrockConfig } from "./languageModels/llmConfigs/titanConfig";
-
+import { TogetherAIConfig } from "./languageModels/llmConfigs/togetherAIConfig";
 export const EXAMPLE_ELEMENT_LIMIT = 1000
 
 // These represent the file extensions for the symbolic patch and alignment datasets
@@ -42,7 +42,7 @@ export const OPENAI_PROVIDER = "openai"
 export const BEDROCK_PROVIDER = "bedrock"
 export const LLAMA_BEDROCK_PROVIDER = "llama_bedrock"
 export const TITAN_BEDROCK_PROVIDER = "aws_titan_bedrock"
-
+export const TOGETHER_AI_PROVIDER = "together_ai"
 // model type strings
 export const TEACHER_MODEL = "teacher"
 export const DISTILLED_MODEL = "distillation"
@@ -62,6 +62,16 @@ export const DEFAULT_TEACHER_MODELS = {
   "anthropic.claude-v2:1": new ClaudeConfig({modelName: "anthropic.claude-v2:1", contextLength: 200000}),
   "llama_70b_chat_aws": new LlamaBedrockConfig({modelName: "meta.llama2-70b-chat-v1", contextLength: 4096}),
   "llama_13b_chat_aws": new LlamaBedrockConfig({modelName: "meta.llama2-13b-chat-v1", contextLength: 4096}),
+  "Mixtral-8x7B": new TogetherAIConfig({modelName: "mistralai/Mixtral-8x7B-Instruct-v0.1",
+                                        chatTemplate: "{user_prompt}", // for some reason this worked better than using their own supplied chat template
+                                        contextLength: 32768}),
+  "OpenHermes-2p5-Mistral": new TogetherAIConfig({modelName: "mistralai/OpenHermes-2p5-Mistral-7B",
+                                                    contextLength: 32768}),
+  "llama13b-togetherai": new TogetherAIConfig({modelName: "togethercomputer/llama-2-13b-chat", contextLength: 4096}),
+  "openchat-3.5": new TogetherAIConfig({modelName: "openchat/openchat-3.5-1210", contextLength: 4096}),
+  "Mixtral-8x7B-DPO": new TogetherAIConfig({modelName: "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO", contextLength: 32768}),
+  "Yi-34B-Chat": new TogetherAIConfig({modelName: "zero-one-ai/Yi-34B-Chat", contextLength: 4096}),
+  "Mistral-7B-Instruct-v0.2": new TogetherAIConfig({modelName: "mistralai/Mistral-7B-Instruct-v0.2", contextLength: 32768})
 }
 
 export const DEFAULT_STUDENT_MODELS = {

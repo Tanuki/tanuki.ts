@@ -1043,10 +1043,10 @@ export class PatchFunctionCompiler {
 export default function (program: ts.Program, pluginConfig: PluginConfig, { ts: tsInstance }: TransformerExtras) {
   console.log("Instantiating Tanuki")
   //const { Tanuki } = require('./tanuki');
-  const compiler = new PatchFunctionCompiler(program, tsInstance);
+  let compiler = new PatchFunctionCompiler(program, tsInstance);
   compiler.clearFile()
   return (ctx: ts.TransformationContext) => {
-    //const tanuki = new Tanuki();
+    //const tanuki = new Tanuki()
     return (sourceFile: ts.SourceFile) => {
       compiler.compile(sourceFile);
 

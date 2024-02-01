@@ -27,10 +27,10 @@ describe('Configurability Tests', () => {
       })
     })
 
-    const doubleNumberDescription = Register.loadFunctionDescription('doubleNumber', 'Double the input number');
+    const doubleNumberDescription = Register.loadFunctionDescription("Functions", 'doubleNumber', 'Double the input number');
     const doubleNumberHash = doubleNumberDescription.hash();
 
-    const tripleNumberDescription = Register.loadFunctionDescription('tripleNumber', 'Triple the input number');
+    const tripleNumberDescription = Register.loadFunctionDescription("Functions", 'tripleNumber', 'Triple the input number');
     const tripleNumberHash = tripleNumberDescription.hash();
 
     expect(functionModeler.environmentId).toEqual(12);

@@ -104,6 +104,10 @@ export class OpenAIAPI implements EmbeddingAPI<number>, LLMApi{
       maxNewTokens = 512
     } = kwargs;
 
+    if (model.parsingHelperTokens?.startToken) {
+      prompt = prompt + model.parsingHelperTokens.startToken;
+    }
+
     const params: OpenAI.Chat.ChatCompletionCreateParams = {
       model: model.modelName,
       messages: [

@@ -1,4 +1,4 @@
-import { OPENAI_PROVIDER, LLAMA_BEDROCK_PROVIDER, TITAN_BEDROCK_PROVIDER } from './constants';
+import { OPENAI_PROVIDER, LLAMA_BEDROCK_PROVIDER, TITAN_BEDROCK_PROVIDER, TOGETHER_AI_PROVIDER } from './constants';
 import { FinetuneJob } from './models/finetuneJob';
 
 interface Finetunable {
@@ -33,8 +33,11 @@ class APIManager {
       const { LLamaBedrockAPI } = await import('./languageModels/llamaBedrockAPI');
       this.apiProviders[provider] = new LLamaBedrockAPI();
     } else if (provider === TITAN_BEDROCK_PROVIDER) {
-      const { TitanBedrockAPI } = await import('./languageModels/titanBedrockAPI');
+      const {TitanBedrockAPI} = await import('./languageModels/titanBedrockAPI');
       this.apiProviders[provider] = new TitanBedrockAPI();
+    } else if (provider === TOGETHER_AI_PROVIDER) {
+      const { TogetherAIAPI } = await import('./languageModels/togetherAIAPI');
+      this.apiProviders[provider] = new TogetherAIAPI();
     } else {
       throw new Error(`Model provider ${provider} is currently not supported.`);
     }

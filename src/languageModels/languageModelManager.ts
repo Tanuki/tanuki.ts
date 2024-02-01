@@ -156,7 +156,6 @@ export class LanguageModelManager {
     if (currentFunctionSetup) {
       let generatorModel = currentFunctionSetup.model;
       if (isDistilledModel) {
-        generatorModel = currentFunctionSetup.model;
         console.info(`Generating function outputs for ${functionDescription.name} with a finetuned model: ${model.modelName}.`)
       } else if (generatorModel === "") {
         console.info(`Found ${currentFunctionSetup.examples.length} align statements for ${functionDescription.name}. Generating function outputs with ${model.modelName}.`);
@@ -329,8 +328,8 @@ export class LanguageModelManager {
 
     const instructionPrompt = model.instructions;
     const argsString = JSON.stringify(args);
-    const inputToken = model.parsingHelperTokens ? model.parsingHelperTokens.startToken : '';
-    const content = `${instructionPrompt}\nFunction: ${f}\n${exampleInput}---\nInputs:\nArgs: ${argsString}\nOutput:${inputToken}`;
+    //const inputToken = model.parsingHelperTokens ? model.parsingHelperTokens.startToken : '';
+    const content = `${instructionPrompt}\nFunction: ${f}\n${exampleInput}---\nInputs:\nArgs: ${argsString}\nOutput:`;
     return content
   }
 

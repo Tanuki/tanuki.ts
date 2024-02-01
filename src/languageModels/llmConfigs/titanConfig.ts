@@ -1,4 +1,4 @@
-import { LLAMA_BEDROCK_PROVIDER, OPENAI_PROVIDER, TITAN_BEDROCK_PROVIDER } from "../../constants";
+import { TITAN_BEDROCK_PROVIDER } from "../../constants";
 import { BaseModelConfig } from "./baseModelConfig";
 
 /*

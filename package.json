@@ -1,11 +1,11 @@
 {
   "name": "tanuki.ts",
-  "version": "0.0.1-development",
+  "version": "0.1.4-rc-1",
   "description": "TypeScript client for building LLM-powered applications",
   "main": "./lib/index.js",
   "type": "module",
   "files": [
-    "lib/**/*"
+    "lib/src/*"
   ],
   "scripts": {
     "build": "tspc --project tsconfig.build.json",
