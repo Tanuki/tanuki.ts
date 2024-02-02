@@ -44,10 +44,13 @@
     "semantic-release",
     "codecov"
   ],
-  "bugs": {
-    "url": "https://github.com/ryansonshine/typescript-npm-package-template/issues"
+  "bin": {
+    "tanuki-type-compiler": "./preprocess.mjs"
   },
-  "homepage": "https://github.com/ryansonshine/typescript-npm-package-template#readme",
+  "bugs": {
+    "url": "https://github.com/Tanuki/tanuki.ts/issues"
+  },
+  "homepage": "https://github.com/Tanuki/tanuki.ts/#readme",
   "devDependencies": {
     "@babel/core": "^7.23.7",
     "@babel/preset-env": "^7.23.8",

@@ -41,17 +41,19 @@ Lastly, the more you use Tanuki functions, the cheaper and faster they gets (up 
  * Declare the function that you want Tanuki to provide.
  */
 class Functions {
-  someFunction = patch<TypedOutput, TypedInput>()`Include the instruction that your function will execute`;
+  static someFunction = patch<TypedOutput, TypedInput>()
+      `{The instruction that your function will execute}`;
 }
 
 /**
  * Align your function to the expected behaviour using Jest-like assertions
  */
 Tanuki.align(async (it) => {
-  it("testSomeFunction", async (expect) => {
+  it("should correctly classify positive affirmation", async (expect) => {
     const exampleTypedInput: TypedInput = "I love you";
     const exampleTypedOutput: TypedOutput = "Good";
-    expect(await new Functions().someFunction(exampleTypedInput)).toEqual(exampleTypedOutput);
+    const result = await Functions.someFunction(exampleTypedInput);
+    expect(result).toEqual(exampleTypedOutput);
   });
 });
 ```
@@ -69,6 +71,7 @@ Tanuki.align(async (it) => {
 <!-- TOC --><a name="installation-and-getting-started"></a>
 ## Installation and Getting Started
 <!-- TOC --><a name="installation"></a>
+
 ### Installation
 ```bash
 npm install tanuki.ts
@@ -85,7 +88,8 @@ export AWS_SECRET_ACCESS_KEY=...
 export AWS_ACCESS_KEY_ID=...
 ```
 
-Next, we need to install the Tanuki type transformer. This will allow Tanuki to be aware of your patched functions and types at runtime, as these types are usually erased by the Typescript compiler when transpiling into Javascript.
+#### Default Setup
+Next, we need to install the Tanuki type transformer. This will allow Tanuki to be aware of your patched functions and types at runtime, as these types are erased when transpiling into Javascript.
 ```typescript
 npm install ts-patch --save-dev
 npx ts-patch install
@@ -104,15 +108,28 @@ Next, you need to add the Tanuki transformer to your `tsconfig.json` file:
   }
 }
 ```
-This is required for Tanuki to be aware of your patched functions and types at runtime, as these types are usually erased by the Typescript compiler when transpiling into Javascript.
 
+#### Next.js Setup
+As Next.js has it's own build system, you must explicitly add the Tanuki transformer to your `package.json` file instead by adding the following scripts.
+
+```json
+{
+  "scripts": {
+    "predev": "tanuki-type-compiler",
+    "prebuild": "tanuki-type-compiler",
+    "prestart": "tanuki-type-compiler"
+  }
+}
+```
+
+This will ensure that Tanuki can extract your patched functions before the Next.js build process.
 
 
 <!-- TOC --><a name="getting-started"></a>
 ### Getting Started
 
 To get started:
-1. Create a `patch` function stub, including your input and output types, and an instruction.
+1. Create a `patch` function stub as a static member of a class, including your input and output types, and an instruction.
 2. (Optional) Create jest-like equivalent assertions in a `Tanuki.align` block, declaring the expected behaviour of your patched function with different inputs.
 
 Once you have built your code (to make Tanuki aware of your types), the `patch` function will be registered and can be invoked as normal.
@@ -134,7 +151,8 @@ type Message = string;
  * Declare the function that you want Tanuki to provide.
  */
 class Functions {
-  classifySentiment = patch<Sentiment, Message>()`Classifies message from the user based on sentiment`;
+  static classifySentiment = patch<Sentiment, Message>()
+      `Classifies message from the user based on sentiment`;
 }
 
 /**
@@ -142,18 +160,16 @@ class Functions {
  */
 Tanuki.align(async (it) => {
   it("alignClassifySentiment", async (expect) => {
-    const functions = new Functions();
-    expect(await functions.classifySentiment("I love you")).toEqual('Good');
-    expect(await functions.classifySentiment("I hate you")).toEqual('Bad');
-    expect(await functions.classifySentiment("People from Phoenix are called Phoenicians")).toBeNull();
+    expect(await Functions.classifySentiment("I love you")).toEqual('Good');
+    expect(await Functions.classifySentiment("I hate you")).toEqual('Bad');
+    expect(await Functions.classifySentiment("People from Phoenix are called Phoenicians")).toBeNull();
   });
 });
 
 // Example usage of the patched function somewhere else in your code
 const runExamples = async () => {
-  const functions = new Functions();
-  console.log(await functions.classifySentiment("I like you")); // Expect 'Good' or null
-  console.log(await functions.classifySentiment("Apples might be red")); // Expect null
+  console.log(await Functions.classifySentiment("I like you")); // Expect 'Good' or null
+  console.log(await Functions.classifySentiment("Apples might be red")); // Expect null
 };
 
 runExamples();
@@ -265,15 +281,16 @@ Test-Driven Alignment (TDA) adapts this concept to align the behavior of a patch
 
 To align the behaviour of your patched function to your needs, decorate a function with `@align` and assert the outputs of the function with the ‘assert’ statement as is done with standard tests.
 
-```python
-@tanuki.align 
-def align_classify_sentiment(): 
-    assert classify_sentiment("I love this!") == 'Good' 
-    assert classify_sentiment("I hate this.") == 'Bad'
-   
-@tanuki.align
-def align_score_sentiment():
-    assert score_sentiment("I like you") == 7
+```typescript
+import { Finance } from './finance';
+import { Tanuki } from 'tanuki.ts';
+
+Tanuki.align((it) => {
+    it("should extract company names whose stock is increasing", async (expect) => {
+        const input1 = "Consumer spending makes up a huge fraction of the overall economy. Investors are therefore always looking at consumers to try to gauge whether their financial condition remains healthy. That's a big part of why the stock market saw a bear market in 2022, as some feared that a consumer-led recession would result in much weaker business performance across the sector.\nHowever, that much-anticipated recession hasn't happened yet, and there's still plenty of uncertainty about the future direction of consumer-facing stocks. A pair of earnings reports early Wednesday didn't do much to resolve the debate, as household products giant Procter & Gamble (PG 0.13%) saw its stock rise even as recreational vehicle manufacturer Winnebago Industries (WGO 0.58%) declined.";
+        expect(await Finance.extractStockWinnersVol6(input1)).toEqual(["Procter & Gamble"]);
+    })
+})
 ```
 
 By writing a test that encapsulates the expected behaviour of the tanuki-patched function, you declare the contract that the function must fulfill. This enables you to:
@@ -308,7 +325,7 @@ We tested out model distillation using Tanuki using OpenAI models on Squad2, Spi
 ### Intro
 <!-- TOC --><a name="what-is-tanuki-in-plain-words"></a>
 #### What is Tanuki in plain words?
-Tanuki is a simple and seamless way to create LLM augmented functions in python, which ensure the outputs of the LLMs follow a specific structure. Moreover, the more you call a patched function, the cheaper and faster the execution gets.
+Tanuki is a simple and seamless way to create LLM augmented functions in Typescript and Python, which ensure the outputs of the LLMs follow a specific structure. Moreover, the more you call a patched function, the cheaper and faster the execution gets.
 
 <!-- TOC --><a name="how-does-this-compare-to-other-frameworks-like-langchain"></a>
 #### How does this compare to other frameworks like LangChain?
