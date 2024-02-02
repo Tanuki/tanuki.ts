@@ -1,5 +1,5 @@
-import { TITAN_BEDROCK_PROVIDER } from "../../constants";
-import { BaseModelConfig } from "./baseModelConfig";
+import { TITAN_BEDROCK_PROVIDER } from '../../constants';
+import { BaseModelConfig } from './baseModelConfig';
 
 /*
   Config for AWS Titan Bedrock models.
@@ -7,17 +7,16 @@ import { BaseModelConfig } from "./baseModelConfig";
   as LLM generation has not been implemented yet, only embedding
  */
 export class TitanBedrockConfig extends BaseModelConfig {
+  modelName: string;
+  provider: string = TITAN_BEDROCK_PROVIDER;
+  contextLength: number = -1;
 
-  modelName: string
-  provider: string = TITAN_BEDROCK_PROVIDER
-  contextLength: number = -1
-
-  constructor(config: {modelName: string, contextLength: number}) {
+  constructor(config: { modelName: string; contextLength: number }) {
     super({
       modelName: config.modelName,
       provider: TITAN_BEDROCK_PROVIDER,
-      contextLength: config.contextLength, }
-    )
+      contextLength: config.contextLength,
+    });
     this.modelName = config.modelName;
     this.contextLength = config.contextLength;
   }

@@ -6,11 +6,16 @@ import BloomFilterFileSystemDriver from '../persistence/bloomFilterFileSystemDri
 import AbstractBufferedLogger from './abstractBufferedLogger';
 import { userDataDir } from '../utils';
 import {
-  ALIGN_FILE_EXTENSION, LIB_NAME, NEGATIVE_EMBEDDABLE_ALIGNMENTS,
+  ALIGN_FILE_EXTENSION,
+  LIB_NAME,
+  NEGATIVE_EMBEDDABLE_ALIGNMENTS,
   NEGATIVE_FILE_EXTENSION,
-  PATCH_FILE_EXTENSION, PATCHES, POSITIVE_EMBEDDABLE_ALIGNMENTS,
-  POSITIVE_FILE_EXTENSION, SYMBOLIC_ALIGNMENTS
-} from "../constants";
+  PATCH_FILE_EXTENSION,
+  PATCHES,
+  POSITIVE_EMBEDDABLE_ALIGNMENTS,
+  POSITIVE_FILE_EXTENSION,
+  SYMBOLIC_ALIGNMENTS,
+} from '../constants';
 //const path = require('path');
 import * as path from 'path';
 export class FilesystemBufferedLogger extends AbstractBufferedLogger {
@@ -30,7 +35,7 @@ export class FilesystemBufferedLogger extends AbstractBufferedLogger {
     return new BloomFilterFileSystemDriver(this.logDirectory);
   }
 
-  getPatchLocationForFunction(funcHash: string, extension = ""): string {
+  getPatchLocationForFunction(funcHash: string, extension = ''): string {
     return join(this.logDirectory, funcHash + extension);
   }
 
@@ -84,7 +89,10 @@ export class FilesystemBufferedLogger extends AbstractBufferedLogger {
       patches: PATCH_FILE_EXTENSION,
     };
 
-    const logFilePath = join(this.logDirectory, funcHash + datasetTypeMap[datasetType]);
+    const logFilePath = join(
+      this.logDirectory,
+      funcHash + datasetTypeMap[datasetType]
+    );
     if (!fs.existsSync(logFilePath)) {
       if (returnType === 'both') return [0, null];
       if (returnType === 'dataset') return null;
@@ -94,14 +102,22 @@ export class FilesystemBufferedLogger extends AbstractBufferedLogger {
     try {
       const dataset = fs.readFileSync(logFilePath, 'utf-8');
       const datasetLength = dataset.split('\n').length;
-      return returnType === 'both' ? [datasetLength, dataset] : (returnType === 'dataset' ? dataset : datasetLength);
+      return returnType === 'both'
+        ? [datasetLength, dataset]
+        : returnType === 'dataset'
+        ? dataset
+        : datasetLength;
     } catch (e) {
-      return returnType === 'both' ? [0, null] : (returnType === 'dataset' ? null : 0);
+      return returnType === 'both'
+        ? [0, null]
+        : returnType === 'dataset'
+        ? null
+        : 0;
     }
   }
 
   loadExistingDatasets(): Record<string, Record<string, number>> {
-    const datasetLengths: Record<string, Record<string, number>> = {}
+    const datasetLengths: Record<string, Record<string, number>> = {};
     datasetLengths[SYMBOLIC_ALIGNMENTS] = {};
     datasetLengths[POSITIVE_EMBEDDABLE_ALIGNMENTS] = {};
     datasetLengths[NEGATIVE_EMBEDDABLE_ALIGNMENTS] = {};
@@ -111,29 +127,37 @@ export class FilesystemBufferedLogger extends AbstractBufferedLogger {
       fs.mkdirSync(this.logDirectory, { recursive: true });
     }
 
-    const files = fs.readdirSync(this.logDirectory).filter(file => !file.endsWith('.json'));
+    const files = fs
+      .readdirSync(this.logDirectory)
+      .filter(file => !file.endsWith('.json'));
 
     for (const file of files) {
-      const datasetType = file.includes(ALIGN_FILE_EXTENSION) ? SYMBOLIC_ALIGNMENTS :
-        file.includes(POSITIVE_FILE_EXTENSION) ? POSITIVE_EMBEDDABLE_ALIGNMENTS :
-          file.includes(NEGATIVE_FILE_EXTENSION) ? NEGATIVE_EMBEDDABLE_ALIGNMENTS : PATCHES;
-      const funcHash = file.replace(new RegExp(`(${ALIGN_FILE_EXTENSION}|${PATCH_FILE_EXTENSION}|${POSITIVE_FILE_EXTENSION}|${NEGATIVE_FILE_EXTENSION})$`), '');
-
+      let datasetType = '';
       if (file.includes(ALIGN_FILE_EXTENSION)) {
-        datasetLengths[SYMBOLIC_ALIGNMENTS][funcHash] = -1;
+        datasetType = SYMBOLIC_ALIGNMENTS;
       } else if (file.includes(POSITIVE_FILE_EXTENSION)) {
-        datasetLengths[POSITIVE_EMBEDDABLE_ALIGNMENTS][funcHash] = -1;
+        datasetType = POSITIVE_EMBEDDABLE_ALIGNMENTS;
       } else if (file.includes(NEGATIVE_FILE_EXTENSION)) {
-        datasetLengths[NEGATIVE_EMBEDDABLE_ALIGNMENTS][funcHash] = -1;
+        datasetType = NEGATIVE_EMBEDDABLE_ALIGNMENTS;
       } else if (file.includes(PATCH_FILE_EXTENSION)) {
-        datasetLengths[PATCHES][funcHash] = -1;
+        datasetType = PATCHES;
+      }
+      const funcHash = file
+        .replace(ALIGN_FILE_EXTENSION, '')
+        .replace(PATCH_FILE_EXTENSION, '');
+      if (datasetType in datasetLengths) {
+        datasetLengths[datasetType][funcHash] = -1;
       }
     }
 
     return datasetLengths;
   }
 
-  write(path: string, data: string, mode: 'w' | 'a' | 'a+b' | 'a+' = 'w'): void {
+  write(
+    path: string,
+    data: string,
+    mode: 'w' | 'a' | 'a+b' | 'a+' = 'w'
+  ): void {
     fs.writeFileSync(path, data, { flag: mode });
   }
 
@@ -142,9 +166,10 @@ export class FilesystemBufferedLogger extends AbstractBufferedLogger {
   }
 
   getHashFromPath(path: string): string {
-    return path.replace(PATCH_FILE_EXTENSION, "")
-      .replace(this.logDirectory, "")
-      .replace(/\\/g, "")
+    return path
+      .replace(PATCH_FILE_EXTENSION, '')
+      .replace(this.logDirectory, '')
+      .replace(/\\/g, '');
   }
 }
 

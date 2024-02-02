@@ -1,4 +1,4 @@
-import { BaseModelConfig } from "../languageModels/llmConfigs/baseModelConfig";
+import { BaseModelConfig } from '../languageModels/llmConfigs/baseModelConfig';
 
 export interface FunctionConfig {
   distilledModel: BaseModelConfig;

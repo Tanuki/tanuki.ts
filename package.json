@@ -12,7 +12,7 @@
     "start": "node --experimental-vm-modules ./lib/index.js",
     "clean": "rm -rf ./lib/",
     "cm": "cz",
-    "lint": "eslint ./src/**/*.ts --fix",
+    "lint": "eslint \"src/**/*.ts\" \"src/*.ts\" --fix",
     "prepare": "husky install",
     "semantic-release": "semantic-release",
     "test:watch": "node node_modules/.bin/jest --config jest.config.mjs --watch",
@@ -28,10 +28,10 @@
   "author": {
     "name": "Jack Hopkins",
     "email": "jackhopkins@users.noreply.github.com",
-    "url": "https://github.com/ryansonshine"
+    "url": "https://github.com/JackHopkins"
   },
   "engines": {
-    "node": ">=12.0"
+    "node": ">=13.0"
   },
   "keywords": [
     "boilerplate",
@@ -60,11 +60,11 @@
     "@types/jest": "^29.1.0",
     "@types/node": "^12.20.11",
     "@types/uuid": "^9.0.7",
-    "@typescript-eslint/eslint-plugin": "^4.22.0",
-    "@typescript-eslint/parser": "^4.22.0",
+    "@typescript-eslint/eslint-plugin": "^6.20.0",
+    "@typescript-eslint/parser": "^6.20.0",
     "babel-jest": "^29.7.0",
     "conventional-changelog-conventionalcommits": "^5.0.0",
-    "eslint": "^7.25.0",
+    "eslint": "^8.56.0",
     "eslint-config-prettier": "^8.3.0",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-prettier": "^3.4.0",

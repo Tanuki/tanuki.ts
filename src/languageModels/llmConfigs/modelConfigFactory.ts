@@ -1,16 +1,18 @@
 import {
   DEFAULT_DISTILLED_MODEL_NAME,
-  DEFAULT_TEACHER_MODELS, DISTILLED_MODEL,
+  DEFAULT_TEACHER_MODELS,
+  DISTILLED_MODEL,
   LLAMA_BEDROCK_PROVIDER,
-  OPENAI_PROVIDER, TEACHER_MODEL,
+  OPENAI_PROVIDER,
+  TEACHER_MODEL,
   DEFAULT_STUDENT_MODELS,
-  TITAN_BEDROCK_PROVIDER
-} from "../../constants";
-import { LlamaBedrockConfig } from "./llamaConfig";
-import { OpenAIConfig } from "./openAIConfig";
-import { TitanBedrockConfig } from "./titanConfig";
-import { BaseModelConfig } from "./baseModelConfig";
-import { FunctionConfig } from "../../models/functionConfig";
+  TITAN_BEDROCK_PROVIDER,
+} from '../../constants';
+import { LlamaBedrockConfig } from './llamaConfig';
+import { OpenAIConfig } from './openAIConfig';
+import { TitanBedrockConfig } from './titanConfig';
+import { BaseModelConfig } from './baseModelConfig';
+import { FunctionConfig } from '../../models/functionConfig';
 
 interface ModelConfigInput {
   modelName: string;
@@ -21,8 +23,13 @@ interface ModelConfigInput {
 }
 
 export class ModelConfigFactory {
-  public static loadFunctionConfigFromDict(jsonObject: any): FunctionConfig {
-    const distilledModel = ModelConfigFactory.createConfig(jsonObject.distilledModel, DISTILLED_MODEL) as BaseModelConfig;
+  public static loadFunctionConfigFromDict(
+    jsonObject: FunctionConfig
+  ): FunctionConfig {
+    const distilledModel = ModelConfigFactory.createConfig(
+      jsonObject.distilledModel,
+      DISTILLED_MODEL
+    );
     const currentModelStats = jsonObject.currentModelStats;
     const lastTrainingRun = jsonObject.lastTrainingRun;
     const currentTrainingRun = jsonObject.currentTrainingRun;
@@ -31,7 +38,9 @@ export class ModelConfigFactory {
 
     let teacherModels: BaseModelConfig[] = [];
     if (jsonObject.teacherModels && jsonObject.teacherModels.length > 0) {
-      teacherModels = jsonObject.teacherModels.map((model: any) => ModelConfigFactory.createConfig(model, DISTILLED_MODEL) as BaseModelConfig);
+      teacherModels = jsonObject.teacherModels.map((model: BaseModelConfig) =>
+        ModelConfigFactory.createConfig(model, DISTILLED_MODEL)
+      );
     }
 
     return {
@@ -41,10 +50,13 @@ export class ModelConfigFactory {
       currentTrainingRun,
       teacherModels,
       nrOfTrainingRuns,
-      currentModel
+      currentModel,
     };
   }
-  public static createConfig(inputConfig: string | ModelConfigInput |BaseModelConfig, type: string): BaseModelConfig {
+  public static createConfig(
+    inputConfig: string | ModelConfigInput | BaseModelConfig,
+    type: string
+  ): BaseModelConfig {
     if (inputConfig instanceof BaseModelConfig) {
       return inputConfig;
     }
@@ -58,9 +70,12 @@ export class ModelConfigFactory {
       } else if (type === TEACHER_MODEL) {
         // @ts-ignore
         if (!DEFAULT_TEACHER_MODELS[inputConfig]) {
-          throw new Error("Error loading the teacher model, saved config model was saved a string but is not a default model");
+          throw new Error(
+            'Error loading the teacher model, saved config model was saved a string but is not a default model'
+          );
         }
         // @ts-ignore
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         return DEFAULT_TEACHER_MODELS[inputConfig];
       }
     } else {
@@ -75,10 +90,12 @@ export class ModelConfigFactory {
           try {
             return new BaseModelConfig(inputConfig); // Assuming BaseModelConfig can be constructed this way
           } catch (error) {
-            throw new Error("Error loading the model config, saved config model was saved as a dict but is not a valid model config");
+            throw new Error(
+              'Error loading the model config, saved config model was saved as a dict but is not a valid model config'
+            );
           }
       }
     }
-    throw new Error("Invalid inputConfig type");
+    throw new Error('Invalid inputConfig type');
   }
 }

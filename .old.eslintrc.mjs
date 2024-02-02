@@ -4,7 +4,9 @@ export default {
   plugins: ['@typescript-eslint', 'node', 'prettier'],
   parserOptions: {
     tsconfigRootDir: __dirname,
-    project: ['./tsconfig.json'],
+    project: './tsconfig.json',
+    ecmaVersion: 2020,
+    sourceType: 'module'
   },
   extends: [
     'eslint:recommended',

@@ -1,10 +1,9 @@
-
-import { PluginConfig, TransformerExtras } from "ts-patch";
+import { PluginConfig, TransformerExtras } from 'ts-patch';
 import * as fs from 'fs';
 import * as path from 'path';
 import type * as ts from 'typescript';
-import { SourceFile } from "typescript";
-import crypto from "crypto";
+import { Expression, SourceFile } from 'typescript';
+import crypto from 'crypto';
 
 // This unfortunately has to be defined twice - also in src/constants.ts.
 // This is because this code is run at compile time, before the constants are loaded.
@@ -51,7 +50,7 @@ class CompiledFunctionDescription {
   docstring: string;
   parentName?: string;
   sourceFile?: string;
-  inputTypeDefinition?: string
+  inputTypeDefinition?: string;
   inputTypeSchema?: JSONSchema;
   outputTypeDefinition?: string;
   outputTypeSchema?: JSONSchema;
@@ -98,12 +97,14 @@ class CompiledFunctionDescription {
     if (purpose === 'general') {
       return crypto.createHash('md5').update(jsonEncoded).digest('hex');
     } else if (purpose === 'finetune') {
-      return crypto.createHash('shake256', { outputLength: 8 }).update(jsonEncoded).digest('hex');
+      return crypto
+        .createHash('shake256', { outputLength: 8 })
+        .update(jsonEncoded)
+        .digest('hex');
     }
     throw new Error('Invalid hashing purpose');
   }
 }
-
 
 export class PatchFunctionCompiler {
   private readonly sourceFiles: ReadonlyArray<ts.SourceFile>;
@@ -118,22 +119,25 @@ export class PatchFunctionCompiler {
 
   private ts: typeof ts;
 
-  private compiledFunctionNames: string[]
+  private compiledFunctionNames: string[];
   private currentScope: ts.Node[] = [];
-  private currentClassOrModule: ts.ClassDeclaration | ts.ModuleDeclaration | null = null;
+  private currentClassOrModule:
+    | ts.ClassDeclaration
+    | ts.ModuleDeclaration
+    | null = null;
 
   constructor(private program: ts.Program, tsInstance: typeof ts) {
     //this.typeChecker = program.getTypeChecker();
     this.sourceFiles = program.getSourceFiles();
     this.ts = tsInstance;
-    this.compiledFunctionNames = []
+    this.compiledFunctionNames = [];
   }
 
   compile(file: ts.SourceFile): void {
     if (!this.doesFileContainPatchFunctions(file)) {
-      return
+      return;
     }
-    console.debug("Compiling " + file.fileName)
+    console.debug('Compiling ' + file.fileName);
     const patchFunctions: CompiledFunctionDescription[] = [];
 
     // First, populate type definitions
@@ -144,7 +148,6 @@ export class PatchFunctionCompiler {
       this.visit(node, patchFunctions, file);
     });
 
-    
     // Finally, compile the type definitions into JSON schemas
     patchFunctions.forEach(pf => {
       const inputTypeDefinitionTokenStream = this.tokenizeTypeScriptType(
@@ -169,12 +172,16 @@ export class PatchFunctionCompiler {
         throw new Error("Function name collision in `"+file.fileName+".\nPlease move `"+name+"` into its own namespace. Tanuki functions have to be unique across all files. ")
       }*/
 
-      this.compiledFunctionNames.push(pf.name)
+      this.compiledFunctionNames.push(pf.name);
     });
 
-
     if (patchFunctions.length > 0) {
-      console.log("Found " + patchFunctions.length + " patched functions in " + file.fileName)
+      console.log(
+        'Found ' +
+          patchFunctions.length +
+          ' patched functions in ' +
+          file.fileName
+      );
       this.writeToJSON(patchFunctions);
     }
   }
@@ -199,7 +206,9 @@ export class PatchFunctionCompiler {
     }
 
     function peekNextToken(): Token {
-      return currentTokenIndex < tokens.length ? tokens[currentTokenIndex] : tokens[currentTokenIndex - 1]
+      return currentTokenIndex < tokens.length
+        ? tokens[currentTokenIndex]
+        : tokens[currentTokenIndex - 1];
     }
 
     function parseObject(): JSONSchema {
@@ -215,7 +224,7 @@ export class PatchFunctionCompiler {
       }
 
       if (/("([^"]+)"\s*\|\s*)+"([^"]+)"/.exec(token)) {
-        return parseType()
+        return parseType();
       }
 
       // Check for array types (e.g., 'string[]')
@@ -236,11 +245,10 @@ export class PatchFunctionCompiler {
     }
 
     function parseType(): JSONSchema {
-      let token = peekNextToken()
+      let token = peekNextToken();
       if (!peekNextToken()) {
         token = getNextToken();
       }
-
 
       if (token === '{') {
         return parseObject();
@@ -251,18 +259,18 @@ export class PatchFunctionCompiler {
           return types.length === 1
             ? { type: 'string', format: 'date-time' }
             : {
-              oneOf: types.map(t =>
-                t === 'Date'
-                  ? { type: 'string', format: 'date-time' }
-                  : { type: t }
-              ),
-            };
+                oneOf: types.map(t =>
+                  t === 'Date'
+                    ? { type: 'string', format: 'date-time' }
+                    : { type: t }
+                ),
+              };
         }
-        if (types.includes("null")) {
-          types.splice(types.indexOf("null"), 1)
+        if (types.includes('null')) {
+          types.splice(types.indexOf('null'), 1);
           return {
-            oneOf: [{ type: "null"}, { type: 'string', enum: types}],
-          }
+            oneOf: [{ type: 'null' }, { type: 'string', enum: types }],
+          };
         }
         return {
           type: 'string',
@@ -300,12 +308,16 @@ export class PatchFunctionCompiler {
     }
     this.ts.forEachChild(node, child => this.extractTypeDefinitions(child));
   }
-  visit(node: ts.Node, patchFunctions: CompiledFunctionDescription[], file: ts.SourceFile): void {
+  visit(
+    node: ts.Node,
+    patchFunctions: CompiledFunctionDescription[],
+    file: ts.SourceFile
+  ): void {
     if (this.ts.isClassDeclaration(node) || this.ts.isModuleDeclaration(node)) {
       const previousClassOrModule = this.currentClassOrModule;
       this.currentClassOrModule = node;
 
-      if ("members" in node) {
+      if ('members' in node) {
         node.members.forEach(member => {
           if (
             this.ts.isPropertyDeclaration(member) &&
@@ -313,12 +325,14 @@ export class PatchFunctionCompiler {
             this.ts.isTaggedTemplateExpression(member.initializer)
           ) {
             const tag = member.initializer.tag;
-            const tagExpression = (tag as any).expression;
+
+            // @ts-ignore
+            const tagExpression = tag.expression as Expression;
 
             if (
               tagExpression &&
               this.ts.isIdentifier(tagExpression) &&
-              tagExpression.escapedText === "patch"
+              this.getNodeText(tagExpression) === 'patch'
             ) {
               const functionName = (member.name as ts.Identifier).text;
               const patchFunction = this.extractPatchFunction(
@@ -338,8 +352,28 @@ export class PatchFunctionCompiler {
 
       this.currentClassOrModule = previousClassOrModule;
     } else {
-      this.ts.forEachChild(node, child => this.visit(child, patchFunctions, file));
+      this.ts.forEachChild(node, child =>
+        this.visit(child, patchFunctions, file)
+      );
     }
+  }
+
+  isNodeStatic(node: ts.Node, _ts: typeof ts): boolean {
+    // Node types that can have modifiers
+    if (
+      _ts.isMethodDeclaration(node) ||
+      _ts.isPropertyDeclaration(node) ||
+      _ts.isConstructorDeclaration(node) ||
+      _ts.isGetAccessor(node) ||
+      _ts.isSetAccessor(node)
+    ) {
+      if (node.modifiers != undefined) {
+        return node.modifiers.some(
+          modifier => modifier.kind === _ts.SyntaxKind.StaticKeyword
+        );
+      }
+    }
+    return false;
   }
 
   extractPatchFunction(
@@ -348,41 +382,31 @@ export class PatchFunctionCompiler {
     file: ts.SourceFile,
     currentClassOrModule: ts.ClassDeclaration | ts.ModuleDeclaration | null
   ): CompiledFunctionDescription | null {
+    console.trace(currentClassOrModule);
     if (
       this.ts.isPropertyDeclaration(node) &&
       node.initializer &&
       this.ts.isTaggedTemplateExpression(node.initializer)
     ) {
-      //console.log('Found tagged template expression');
-      let parent = '';
-      if (node.parent && node.parent.name && this.ts.isClassDeclaration(node.parent)) {
+      //let parent = '';
+      if (
+        node.parent &&
+        node.parent.name &&
+        this.ts.isClassDeclaration(node.parent)
+      ) {
         if (node.parent.name.getText() === 'Function') {
-            throw new Error("The class `Function` cannot have patched functions as members, as this is a reserved word. You could rename the class.")
+          throw new Error(
+            'The class `Function` cannot have patched functions as members, as this is a reserved word. You could rename the class.'
+          );
         }
         // @ts-ignore
-        parent = node.parent.name.getText() + ".";
+        //parent = node.parent.name.getText() + '.';
       }
-      const _this = this
-      function isNodeStatic(node: ts.Node): boolean {
-        // Node types that can have modifiers
-        if (
-          _this.ts.isMethodDeclaration(node) ||
-          _this.ts.isPropertyDeclaration(node) ||
-          _this.ts.isConstructorDeclaration(node) ||
-          _this.ts.isGetAccessor(node) ||
-          (_this.ts.isSetAccessor(node))
-        ) {
-          if (node.modifiers != undefined) {
-            return node.modifiers.some(
-              modifier => modifier.kind === _this.ts.SyntaxKind.StaticKeyword
-            );
-          }
-        }
-        return false;
-      }
-      const staticFlag = isNodeStatic(node);
+      //const _ts = this.ts;
+      this.ts;
+      //const staticFlag = isNodeStatic(node, _ts);
 
-      let name = functionName; // Use the passed function name
+      const name = functionName; // Use the passed function name
 
       const docstringWithTicks = node.initializer.template.getText();
       const docstring = docstringWithTicks.replace(/`/g, '');
@@ -397,16 +421,24 @@ export class PatchFunctionCompiler {
         const inputType = inputTypeNode.getText(file); // Get the textual representation of the input type
         const outputType = outputTypeNode.getText(file); // Get the textual representation of the output type
 
-        const current = this.currentClassOrModule
-        const inputTypeDefinition = this.extractTypeDefinition(inputType, current, file);
-        const outputTypeDefinition = this.extractTypeDefinition(outputType, current, file);
+        const current = this.currentClassOrModule;
+        const inputTypeDefinition = this.extractTypeDefinition(
+          inputType,
+          current,
+          file
+        );
+        const outputTypeDefinition = this.extractTypeDefinition(
+          outputType,
+          current,
+          file
+        );
 
         const type = !outputTypeDefinition.startsWith('Embedding')
           ? FunctionType.SYMBOLIC
           : FunctionType.EMBEDDABLE;
         //name = current?.name?.getText() + "." + name
         // @ts-ignore
-        let parentName = current.name.getText()
+        const parentName = current.name.getText();
         return new CompiledFunctionDescription(
           name,
           docstring,
@@ -429,8 +461,11 @@ export class PatchFunctionCompiler {
 
     return null;
   }
-  extractTypeDefinition(type: string, currentScope: ts.Node | null, file: SourceFile): string {
-
+  extractTypeDefinition(
+    type: string,
+    currentScope: ts.Node | null,
+    file: SourceFile
+  ): string {
     // If the type is a primitive type, return it
     const primitiveTypes = ['number', 'string', 'boolean', 'null'];
     if (primitiveTypes.includes(type)) {
@@ -447,12 +482,14 @@ export class PatchFunctionCompiler {
       }
     }*/
     // Next, try to resolve the type in the current scope
-    let definition = currentScope ? this.findAndResolveTypeInScope(type, currentScope) : undefined;
+    let definition = currentScope
+      ? this.findAndResolveTypeInScope(type, currentScope)
+      : undefined;
     if (definition) {
       return definition;
     }
     if (currentScope) {
-      definition = this.findAndResolveType(type, file)
+      definition = this.findAndResolveType(type, file);
       if (definition) {
         return definition;
       }
@@ -494,19 +531,37 @@ export class PatchFunctionCompiler {
     let resolvedType: string | undefined = undefined;
 
     scopeNode.forEachChild(node => {
-      if (this.ts.isTypeAliasDeclaration(node) && inputType === node.name.text) {
-        resolvedType = this.resolveType(node.type, typeAliases, interfaces, enums);
-      } else if (this.ts.isInterfaceDeclaration(node) && inputType === node.name.text) {
+      if (
+        this.ts.isTypeAliasDeclaration(node) &&
+        inputType === node.name.text
+      ) {
+        resolvedType = this.resolveType(
+          node.type,
+          typeAliases,
+          interfaces,
+          enums
+        );
+      } else if (
+        this.ts.isInterfaceDeclaration(node) &&
+        inputType === node.name.text
+      ) {
         const members = node.members.map(member =>
           this.resolveTypeMember(member, typeAliases, interfaces, enums)
         );
         resolvedType = this.renderInterface(members);
-      } else if (this.ts.isEnumDeclaration(node) && inputType === node.name.text) {
+      } else if (
+        this.ts.isEnumDeclaration(node) &&
+        inputType === node.name.text
+      ) {
         const members = node.members.map(member =>
           this.resolveType(member, typeAliases, interfaces, enums)
         );
         resolvedType = this.renderEnum(members);
-      } else if (this.ts.isClassDeclaration(node) && node.name && inputType === node.name.text) {
+      } else if (
+        this.ts.isClassDeclaration(node) &&
+        node.name &&
+        inputType === node.name.text
+      ) {
         const members = node.members.map(member =>
           this.resolveClassMember(member, typeAliases, interfaces, enums)
         );
@@ -550,7 +605,10 @@ export class PatchFunctionCompiler {
 
     // Iterate through the children of the source file to find and resolve the type
     for (const node of sourceFile.statements) {
-      if (this.ts.isTypeAliasDeclaration(node) && inputType === node.name.text) {
+      if (
+        this.ts.isTypeAliasDeclaration(node) &&
+        inputType === node.name.text
+      ) {
         return this.resolveType(node.type, typeAliases, interfaces, enums);
       } else if (
         this.ts.isInterfaceDeclaration(node) &&
@@ -565,9 +623,8 @@ export class PatchFunctionCompiler {
         inputType === node.name.text
       ) {
         const members = node.members.map(member => {
-            return this.resolveType(member, typeAliases, interfaces, enums)
-          }
-        );
+          return this.resolveType(member, typeAliases, interfaces, enums);
+        });
         return this.renderEnum(members);
       } else if (
         this.ts.isClassDeclaration(node) &&
@@ -579,7 +636,6 @@ export class PatchFunctionCompiler {
         );
         return this.renderInterface(members);
       }
-
     }
   }
 
@@ -615,8 +671,13 @@ export class PatchFunctionCompiler {
       return alias
         ? this.resolveType(alias, typeAliases, interfaces, enums, concreteTypes)
         : node.typeName.getText();
-    } else if (this.ts.isTypeLiteralNode(node) || this.ts.isInterfaceDeclaration(node)) {
-      const members = this.ts.isTypeLiteralNode(node) ? node.members : node.members;
+    } else if (
+      this.ts.isTypeLiteralNode(node) ||
+      this.ts.isInterfaceDeclaration(node)
+    ) {
+      const members = this.ts.isTypeLiteralNode(node)
+        ? node.members
+        : node.members;
       const membersList = members.map(member =>
         this.resolveTypeMember(
           member,
@@ -627,7 +688,10 @@ export class PatchFunctionCompiler {
         )
       );
       return this.renderLiterals(membersList);
-    } else if (this.ts.isUnionTypeNode(node) || this.ts.isIntersectionTypeNode(node)) {
+    } else if (
+      this.ts.isUnionTypeNode(node) ||
+      this.ts.isIntersectionTypeNode(node)
+    ) {
       const members = node.types.map(type =>
         this.resolveType(type, typeAliases, interfaces, enums, concreteTypes)
       );
@@ -791,7 +855,7 @@ export class PatchFunctionCompiler {
       let propertyType = 'any'; // Default type
 
       if (member.type) {
-        const memberTypeName = member.type.getText();
+        //const memberTypeName = member.type.getText();
         // Resolve property type similar to resolveTypeMember
         propertyType = this.resolveType(
           member.type,
@@ -901,10 +965,9 @@ export class PatchFunctionCompiler {
     const sourceFilesWithPatchFunctions: Set<SourceFile> =
       new Set<SourceFile>();
     this.sourceFiles.forEach(sourceFile => {
-
       if (this.doesFileContainPatchFunctions(sourceFile)) {
         // Process the source file to extract patch functions
-        this.ts.forEachChild(sourceFile, node => {
+        this.ts.forEachChild(sourceFile, () => {
           sourceFilesWithPatchFunctions.add(sourceFile);
         });
       }
@@ -912,43 +975,22 @@ export class PatchFunctionCompiler {
     return Array.from(sourceFilesWithPatchFunctions.values());
   }
 
-  /**
-   * Determines if a given source file contains a patch function.
-   *
-   * @param sourceFile A TypeScript source file object.
-   * @returns `true` if the source file contains a patch function, otherwise `false`.
-   */
-  hasPatchFunctionOld(sourceFile: ts.SourceFile): boolean {
-    let hasPatch = false;
-
-    this.ts.forEachChild(sourceFile, node => {
-      if (this.ts.isClassDeclaration(node) && node.members) {
-        for (const member of node.members) {
-          if (this.ts.isPropertyDeclaration(member) && member.initializer) {
-            if (this.ts.isTaggedTemplateExpression(member.initializer)) {
-              const tag = member.initializer.tag;
-
-              if (this.ts.isIdentifier(tag) && tag.escapedText === 'patch') {
-                hasPatch = true;
-                return;
-              }
-            }
-          }
-        }
-      }
-    });
-
-    return hasPatch;
+  getNodeText(node: ts.Node): string {
+    // @ts-ignore
+    return node.escapedText as string;
   }
 
   hasPatchFunction(sourceFile: ts.SourceFile): boolean {
     let hasPatch = false;
-    let _this = this;
+    const _ts = this.ts;
+
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const _getNodeText = this.getNodeText;
     function checkNode(node: ts.Node) {
-      if (_this.ts.isIdentifier(node) && node.escapedText === 'patch') {
+      if (_ts.isIdentifier(node) && _getNodeText(node) === 'patch') {
         hasPatch = true;
       } else {
-        _this.ts.forEachChild(node, checkNode);
+        _ts.forEachChild(node, checkNode);
       }
     }
 
@@ -1014,7 +1056,9 @@ export class PatchFunctionCompiler {
     node: ts.UnionTypeNode | ts.IntersectionTypeNode,
     members: string[]
   ) {
-    return members.join(node.kind === this.ts.SyntaxKind.UnionType ? ' | ' : ' & ');
+    return members.join(
+      node.kind === this.ts.SyntaxKind.UnionType ? ' | ' : ' & '
+    );
   }
 
   private renderLiterals(members: string[]) {
@@ -1028,7 +1072,9 @@ export class PatchFunctionCompiler {
   private renderEnum(enumMembers: string[]) {
     const enumValues = enumMembers.map(member => {
       // Split the member string at '=' and trim each part
-      const parts = member.split('=').map(part => part.trim().replace(/^"|"$/g, ''));
+      const parts = member
+        .split('=')
+        .map(part => part.trim().replace(/^"|"$/g, ''));
 
       // Use the right-hand side if available, otherwise use the left-hand side
       return parts.length > 1 ? parts[1] : parts[0];
@@ -1038,18 +1084,19 @@ export class PatchFunctionCompiler {
   }
 }
 
-
-
-export default function (program: ts.Program, pluginConfig: PluginConfig, { ts: tsInstance }: TransformerExtras) {
-  console.log("Instantiating Tanuki")
+export default function (
+  program: ts.Program,
+  pluginConfig: PluginConfig,
+  { ts: tsInstance }: TransformerExtras
+) {
+  console.log('Instantiating Tanuki');
   //const { Tanuki } = require('./tanuki');
-  let compiler = new PatchFunctionCompiler(program, tsInstance);
-  compiler.clearFile()
+  const compiler = new PatchFunctionCompiler(program, tsInstance);
+  compiler.clearFile();
   return (ctx: ts.TransformationContext) => {
     //const tanuki = new Tanuki()
     return (sourceFile: ts.SourceFile) => {
       compiler.compile(sourceFile);
-
 
       function visit(node: ts.Node): ts.Node {
         return tsInstance.visitEachChild(node, visit, ctx);

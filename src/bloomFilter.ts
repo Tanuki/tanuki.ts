@@ -15,19 +15,31 @@ class BloomFilter {
     falsePositiveProbability?: number
   ) {
     if (!persistence) {
-      throw new Error("Persistence cannot be None, it must be an instance of IBloomFilterPersistence");
+      throw new Error(
+        'Persistence cannot be None, it must be an instance of IBloomFilterPersistence'
+      );
     }
 
-    if (!size && !hashCount && !expectedNumberOfElements && !falsePositiveProbability) {
-      throw new Error("Must specify either (size, hashCount) or (expectedNumberOfElements, falsePositiveProbability)");
+    if (
+      !size &&
+      !hashCount &&
+      !expectedNumberOfElements &&
+      !falsePositiveProbability
+    ) {
+      throw new Error(
+        'Must specify either (size, hashCount) or (expectedNumberOfElements, falsePositiveProbability)'
+      );
     }
 
     if (expectedNumberOfElements && falsePositiveProbability) {
-      [size, hashCount] = BloomFilter.optimalBloomFilterParams(expectedNumberOfElements, falsePositiveProbability);
+      [size, hashCount] = BloomFilter.optimalBloomFilterParams(
+        expectedNumberOfElements,
+        falsePositiveProbability
+      );
     }
 
     if (!size || !hashCount) {
-      throw new Error("Size and hashCount not set. This should never happen.");
+      throw new Error('Size and hashCount not set. This should never happen.');
     }
 
     this.size = size;
@@ -41,8 +53,14 @@ class BloomFilter {
   }
 
   private hashFunctions(str: string): [number, number] {
-    const hash1 = parseInt(crypto.createHash('sha256').update(str).digest('hex'), 16);
-    const hash2 = parseInt(crypto.createHash('md5').update(str).digest('hex'), 16);
+    const hash1 = parseInt(
+      crypto.createHash('sha256').update(str).digest('hex'),
+      16
+    );
+    const hash2 = parseInt(
+      crypto.createHash('md5').update(str).digest('hex'),
+      16
+    );
     return [hash1, hash2];
   }
 
@@ -72,17 +90,22 @@ class BloomFilter {
   public load(): void {
     this.bitArray = this.persistence.load();
 
-    const lengthInBytes = this.bitArray.length/8
-    const expectedLength = Math.ceil(this.size / 8)
+    const lengthInBytes = this.bitArray.length / 8;
+    const expectedLength = Math.ceil(this.size / 8);
     if (lengthInBytes !== expectedLength) {
-      console.warn("Bit array length does not match expected size, and so might be corrupted. Reinitializing.")
-      this.bitArray = this.initBitArray(this.size)
-      this.save()
+      console.warn(
+        'Bit array length does not match expected size, and so might be corrupted. Reinitializing.'
+      );
+      this.bitArray = this.initBitArray(this.size);
+      this.save();
     }
   }
 
-  public static optimalBloomFilterParams(n: number, p: number): [number, number] {
-    const m = - (n * Math.log(p)) / (Math.log(2) ** 2);
+  public static optimalBloomFilterParams(
+    n: number,
+    p: number
+  ): [number, number] {
+    const m = -(n * Math.log(p)) / Math.log(2) ** 2;
     const k = (m / n) * Math.log(2);
     return [Math.ceil(m), Math.ceil(k)];
   }

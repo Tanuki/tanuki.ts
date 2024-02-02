@@ -7,15 +7,18 @@ import { PatchConfig } from './models/patchConfig';
 import { FunctionConfig } from './models/functionConfig';
 import {
   DEFAULT_DISTILLED_MODEL_NAME,
-  DEFAULT_EMBEDDING_MODELS, DEFAULT_STUDENT_MODELS,
+  DEFAULT_EMBEDDING_MODELS,
+  DEFAULT_STUDENT_MODELS,
   DEFAULT_TEACHER_MODELS,
   EXAMPLE_ELEMENT_LIMIT,
-  OPENAI_PROVIDER, PATCHES, SYMBOLIC_ALIGNMENTS
-} from "./constants";
-import functionModeler from "./functionModeler";
-import { APIManager } from "./APIManager";
-import { BaseModelConfig } from "./languageModels/llmConfigs/baseModelConfig";
-import { FunctionType } from "./models/functionType";
+  OPENAI_PROVIDER,
+  PATCHES,
+  SYMBOLIC_ALIGNMENTS,
+} from './constants';
+import functionModeler from './functionModeler';
+import { APIManager, Finetunable } from './APIManager';
+import { BaseModelConfig } from './languageModels/llmConfigs/baseModelConfig';
+import { FunctionType } from './models/functionType';
 // Define an interface for the expected structure of FunctionExample data
 interface FunctionExampleData {
   args: any[];
@@ -30,20 +33,16 @@ export class FunctionModeler {
   public static executeFinetuneBlacklist: Set<string>;
   public static storeDataBlacklist: Set<string>;
   public static startupLoggingChecker: Set<string>;
-  static teacherModelsOverride: Record<string, BaseModelConfig[]>
+  static teacherModelsOverride: Record<string, BaseModelConfig[]>;
 
   private functionConfigs: Record<string, FunctionConfig>;
   private dataWorker: IDatasetWorker;
-  private symbolicAlignBuffer: Record<string, any>;
-  private embeddableAlignBuffer: Record<string, any>;
+  private symbolicAlignBuffer: Record<string, Uint8Array>;
+  private embeddableAlignBuffer: Record<string, Uint8Array>;
   private datasetSizes: Record<string, Record<string, number>>;
   private apiManager: APIManager;
 
-
-  constructor(
-    dataWorker: IDatasetWorker,
-    apiManager: APIManager
-  ) {
+  constructor(dataWorker: IDatasetWorker, apiManager: APIManager) {
     this.functionConfigs = {};
     this.dataWorker = dataWorker;
     this.distillationTokenLimit = 3000;
@@ -69,18 +68,27 @@ export class FunctionModeler {
     this.apiManager = apiManager;
   }
 
-  static configureTeacherModels(teacherModels: (string | BaseModelConfig)[], funcHash: string, taskType: FunctionType): void {
+  static configureTeacherModels(
+    teacherModels: (string | BaseModelConfig)[],
+    funcHash: string,
+    taskType: FunctionType
+  ): void {
     if (!(funcHash in FunctionModeler.teacherModelsOverride)) {
       FunctionModeler.teacherModelsOverride[funcHash] = [];
     }
 
-    let preconfiguredModels = taskType === FunctionType.EMBEDDABLE ? DEFAULT_EMBEDDING_MODELS : DEFAULT_TEACHER_MODELS;
+    const preconfiguredModels =
+      taskType === FunctionType.EMBEDDABLE
+        ? DEFAULT_EMBEDDING_MODELS
+        : DEFAULT_TEACHER_MODELS;
     teacherModels.forEach(model => {
       let modelConfig: BaseModelConfig;
 
       if (typeof model === 'string') {
         if (!(model in preconfiguredModels)) {
-          throw new Error(`Teacher model ${model} not supported by default. Please include it in the list in extended config format`);
+          throw new Error(
+            `Teacher model ${model} not supported by default. Please include it in the list in extended config format`
+          );
         }
         // @ts-ignore
         modelConfig = preconfiguredModels[model];
@@ -100,30 +108,33 @@ export class FunctionModeler {
       }
     });
   }
-  public static setConfig(functionDescription: FunctionDescription, config: PatchConfig) {
+  public static setConfig(
+    functionDescription: FunctionDescription,
+    config: PatchConfig
+  ) {
     const functionHash = functionDescription.hash();
     functionModeler.environmentId = config.environmentId ?? 0;
-    let message = `For ${functionDescription.name} [${functionHash}] the following configuration has been set:`
+    let message = `For ${functionDescription.name} [${functionHash}] the following configuration has been set:`;
     if (config.ignoreFinetuning) {
       functionModeler.executeFinetuneBlacklist.add(functionHash);
-      message += `\n- [ ] Model distillation `
+      message += '\n- [ ] Model distillation ';
     } else {
-      message += `\n- [x] Model distillation `
+      message += '\n- [x] Model distillation ';
     }
 
     if (config.ignoreFinetuneFetching) {
       functionModeler.checkFinetuneBlacklist.add(functionHash);
-      message += `\n- [ ] Use finetuned models`
+      message += '\n- [ ] Use finetuned models';
     } else {
-        message += `\n- [x] Use finetuned models`
+      message += '\n- [x] Use finetuned models';
     }
     if (config.ignoreDataStorage) {
       functionModeler.storeDataBlacklist.add(functionHash);
-      message += `\n- [ ] Runs cached for distillation fine-tuning`
+      message += '\n- [ ] Runs cached for distillation fine-tuning';
     } else {
-      message += `\n- [x] Runs cached for distillation fine-tuning`
+      message += '\n- [x] Runs cached for distillation fine-tuning';
     }
-    console.info(message)
+    console.info(message);
   }
   private getDatasetInfo(
     datasetType: string,
@@ -150,22 +161,27 @@ export class FunctionModeler {
     try {
       // Prepare positive and negative pairs for saving
       const parsedPositivePairs = positivePairs.map(pair =>
-          this.prepareObjectForSaving(pair)
+        this.prepareObjectForSaving(pair)
       );
       const parsedNegativePairs = negativePairs.map(pair =>
-          this.prepareObjectForSaving(pair)
+        this.prepareObjectForSaving(pair)
       );
 
-    // Save the contrastive pairs
-    parsedPositivePairs.forEach(pair => {
-      this.saveContrastiveAlignmentPair(functionHash, parsedArgs, pair, true);
-    });
-    parsedNegativePairs.forEach(pair => {
-      this.saveContrastiveAlignmentPair(functionHash, parsedArgs, pair, false);
-    });
+      // Save the contrastive pairs
+      parsedPositivePairs.forEach(pair => {
+        this.saveContrastiveAlignmentPair(functionHash, parsedArgs, pair, true);
+      });
+      parsedNegativePairs.forEach(pair => {
+        this.saveContrastiveAlignmentPair(
+          functionHash,
+          parsedArgs,
+          pair,
+          false
+        );
+      });
     } catch (error) {
-        console.error('Error saving embeddable alignments', error);
-        throw error;
+      console.error('Error saving embeddable alignments', error);
+      throw error;
     }
   }
 
@@ -321,7 +337,10 @@ export class FunctionModeler {
         const exampleObj = JSON.parse(exampleStr) as FunctionExampleData;
 
         // Define a unique identifier for the example, e.g., a combination of args and output
-        const uniqueId = JSON.stringify({ args: exampleObj.args, output: exampleObj.output });
+        const uniqueId = JSON.stringify({
+          args: exampleObj.args,
+          output: exampleObj.output,
+        });
         if (uniqueExamples.has(uniqueId)) {
           continue; // Skip if this example is already encountered
         }
@@ -365,7 +384,7 @@ export class FunctionModeler {
   async postprocessSymbolicDatapoint(
     funcHash: string,
     functionDescription: FunctionDescription,
-    example: any,
+    example: FunctionExample,
     repaired = true
   ): Promise<void> {
     try {
@@ -383,13 +402,12 @@ export class FunctionModeler {
     }
   }
 
-
   async loadFunctionConfig(
     funcHash: string,
     functionDescription: FunctionDescription
   ): Promise<FunctionConfig> {
-    const [config, defaultUsed] = this.dataWorker.loadFunctionConfig(funcHash)
-    const finetuneProvider: string = config.distilledModel.provider
+    const [config, defaultUsed] = this.dataWorker.loadFunctionConfig(funcHash);
+    const finetuneProvider: string = config.distilledModel.provider;
     if (defaultUsed && !FunctionModeler.checkFinetuneBlacklist.has(funcHash)) {
       const [finetuned, finetuneConfig] = await this.checkForFinetunes(
         functionDescription,
@@ -400,7 +418,7 @@ export class FunctionModeler {
       }
     }
     if (FunctionModeler.teacherModelsOverride[funcHash] !== undefined) {
-      config.teacherModels = FunctionModeler.teacherModelsOverride[funcHash]
+      config.teacherModels = FunctionModeler.teacherModelsOverride[funcHash];
     }
 
     this.functionConfigs[funcHash] = config;
@@ -411,13 +429,15 @@ export class FunctionModeler {
     functionDescription: FunctionDescription,
     finetuneProvider: string
   ): Promise<[boolean, FunctionConfig]> {
-    console.info(`Checking for finetunes for ${functionDescription.name} using ${finetuneProvider}`)
-    const environmentId = encodeInt(functionModeler.environmentId) || "";
+    console.info(
+      `Checking for finetunes for ${functionDescription.name} using ${finetuneProvider}`
+    );
+    const environmentId = encodeInt(functionModeler.environmentId) || '';
     const finetuneHash =
       functionDescription.hash('finetune') + environmentId.trim();
-    const finetunes: FinetuneJob[] = await (await this.apiManager.getProvider(
-      finetuneProvider
-    )).listFinetuned(1000);
+    const finetunes: FinetuneJob[] = await (
+      (await this.apiManager.getProvider(finetuneProvider)) as Finetunable
+    ).listFinetuned(1000);
 
     for (const finetune of finetunes) {
       if (finetune.status === 'succeeded') {
@@ -434,14 +454,19 @@ export class FunctionModeler {
               functionDescription.hash(),
               config
             );
-            console.info(`Found finetuned model for ${functionDescription.name} [${config.distilledModel.modelName}]`)
+            console.info(
+              `Found finetuned model for ${functionDescription.name} [${config.distilledModel.modelName}]`
+            );
             return [true, config];
           } catch (error) {
-            console.info(`Found finetuned model for ${functionDescription.name} [${finetune.fineTunedModel.modelName}] but could not load it`)
+            console.info(
+              `Found finetuned model for ${functionDescription.name} [${finetune.fineTunedModel.modelName}] but could not load it`
+            );
             return [
               false,
               {
-                distilledModel: DEFAULT_STUDENT_MODELS[DEFAULT_DISTILLED_MODEL_NAME],
+                distilledModel:
+                  DEFAULT_STUDENT_MODELS[DEFAULT_DISTILLED_MODEL_NAME],
                 currentModelStats: {
                   trainedOnDatapoints: 0,
                   runningFaults: [],
@@ -457,9 +482,10 @@ export class FunctionModeler {
       }
     }
 
-    console.info(`No finetuned model found for ${functionDescription.name}`)
+    console.info(`No finetuned model found for ${functionDescription.name}`);
     return [
-      false, {
+      false,
+      {
         distilledModel: DEFAULT_STUDENT_MODELS[DEFAULT_DISTILLED_MODEL_NAME],
         currentModelStats: {
           trainedOnDatapoints: 0,
@@ -469,7 +495,7 @@ export class FunctionModeler {
         currentTrainingRun: {},
         teacherModels: [],
         nrOfTrainingRuns: 0,
-      }
+      },
     ];
   }
 
@@ -477,8 +503,9 @@ export class FunctionModeler {
     finetuneHash: string,
     finetune: FinetuneJob
   ): FunctionConfig {
-    const model = finetune.fineTunedModel
-    const finetuneHashEnd = model.modelName.indexOf(finetuneHash) + finetuneHash.length;
+    const model = finetune.fineTunedModel;
+    const finetuneHashEnd =
+      model.modelName.indexOf(finetuneHash) + finetuneHash.length;
     const nextChar = model.modelName.charAt(finetuneHashEnd);
     const nrOfTrainingRuns = decodeInt(nextChar) + 1;
     const nrOfTrainingPoints = Math.pow(2, nrOfTrainingRuns - 1) * 200;
@@ -567,7 +594,10 @@ export class FunctionModeler {
     }
   }
 
-  private checkFinetuningCondition(funcHash: string, functionDescription: FunctionDescription): boolean {
+  private checkFinetuningCondition(
+    funcHash: string,
+    functionDescription: FunctionDescription
+  ): boolean {
     if (!(funcHash in this.functionConfigs)) {
       return false;
     }
@@ -586,9 +616,11 @@ export class FunctionModeler {
       ) as number;
       this.datasetSizes.PATCHES[funcHash] = patchDatasetSize;
       if (!FunctionModeler.startupLoggingChecker.has(funcHash)) {
-        console.info(`Function ${functionDescription.name} [${alignDatasetSize} aligns | ${patchDatasetSize} runs] will be finetuned from` +
-          ` ${this.functionConfigs[funcHash].teacherModels[0].modelName} using ${this.functionConfigs[funcHash].distilledModel.provider} in` +
-          `${trainingThreshold - (patchDatasetSize + alignDatasetSize)} runs`);
+        console.info(
+          `Function ${functionDescription.name} [${alignDatasetSize} aligns | ${patchDatasetSize} runs] will be finetuned from` +
+            ` ${this.functionConfigs[funcHash].teacherModels[0].modelName} using ${this.functionConfigs[funcHash].distilledModel.provider} in` +
+            `${trainingThreshold - (patchDatasetSize + alignDatasetSize)} runs`
+        );
         FunctionModeler.startupLoggingChecker.add(funcHash);
       }
     }
@@ -636,30 +668,34 @@ export class FunctionModeler {
       .replace(/\\n/g, '[SEP_TOKEN]')
       .split('\n')
       .map(x => x.replace('[SEP_TOKEN]', '\\n'))
-      .filter(x => x !== '')
+      .filter(x => x !== '');
 
-     const dataset = datasetStrings.map(x => JSON.parse(x) as FunctionExample);
+    const dataset = datasetStrings.map(x => JSON.parse(x) as FunctionExample);
 
-    const instruction = "You are given below a function description and input data. The function description of what the function must carry out can be found in the Function section, with input and output type hints. The input data can be found in Input section. Using the function description, apply the function to the Input and return a valid output type, that is acceptable by the outputClassDefinition and outputClassHint. Return null if you can't apply the function to the input or if the output is optional and the correct output is null.\nINCREDIBLY IMPORTANT: Only output a JSON-compatible string in the correct response format."
+    const instruction =
+      "You are given below a function description and input data. The function description of what the function must carry out can be found in the Function section, with input and output type hints. The input data can be found in Input section. Using the function description, apply the function to the Input and return a valid output type, that is acceptable by the outputClassDefinition and outputClassHint. Return null if you can't apply the function to the input or if the output is optional and the correct output is null.\nINCREDIBLY IMPORTANT: Only output a JSON-compatible string in the correct response format.";
 
     // Construct finetuning dataset
     const finetuningDataset = dataset.map(x => {
-      return ({
+      return {
         messages: [
           {
             role: 'system',
-            content: `You are a skillful and accurate language model, who applies a described function on input data. Make sure the function is applied accurately and correctly and the outputs follow the output type hints and are valid outputs given the output types.`
+            content:
+              'You are a skillful and accurate language model, who applies a described function on input data. Make sure the function is applied accurately and correctly and the outputs follow the output type hints and are valid outputs given the output types.',
           },
           {
             role: 'user',
-            content: `${instruction}\nFunction: ${functionString}---\nInputs:\nArgs: ${JSON.stringify(x.args)}\nOutput:`
+            content: `${instruction}\nFunction: ${functionString}---\nInputs:\nArgs: ${JSON.stringify(
+              x.args
+            )}\nOutput:`,
           },
           {
             role: 'assistant',
             content: x.output !== null ? JSON.stringify(x.output) : 'None',
-          }
-        ]
-      });
+          },
+        ],
+      };
     });
 
     // Create a string representation of the dataset
@@ -677,17 +713,27 @@ export class FunctionModeler {
     finetuneHash += encodeInt(FunctionModeler.environmentId);
     finetuneHash += encodeInt(nrOfTrainingRuns);
 
-    const alignDatasetSize = this.datasetSizes.SYMBOLIC_ALIGNMENTS[funcHash] || 0;
+    const alignDatasetSize =
+      this.datasetSizes.SYMBOLIC_ALIGNMENTS[funcHash] || 0;
     const patchDatasetSize = this.datasetSizes.PATCHES[funcHash] || 0;
     const totalDatasetSize = alignDatasetSize + patchDatasetSize;
 
-    const datasetBuffer = Buffer.from(datasetString, "utf-8");
-    const finetuneProvider = this.functionConfigs[funcHash].distilledModel.provider;
+    const datasetBuffer = Buffer.from(datasetString, 'utf-8');
+    const finetuneProvider =
+      this.functionConfigs[funcHash].distilledModel.provider;
 
+    // @ts-ignore
     try {
-      console.info(`Starting finetuning for ${functionDescription.name} using ${finetuneProvider}`)
-      const provider = await this.apiManager.getProvider(finetuneProvider);
-      const finetuningResponse: FinetuneJob = await provider.finetune(datasetBuffer, finetuneHash);
+      console.info(
+        `Starting finetuning for ${functionDescription.name} using ${finetuneProvider}`
+      );
+      const provider = (await this.apiManager.getProvider(
+        finetuneProvider
+      )) as Finetunable;
+      const finetuningResponse: FinetuneJob = await provider.finetune(
+        datasetBuffer,
+        finetuneHash
+      );
 
       this.functionConfigs[funcHash].currentTrainingRun = {
         jobId: finetuningResponse.id,
@@ -697,12 +743,20 @@ export class FunctionModeler {
 
       // Update the config file
       this.updateConfigFile(funcHash);
-    } catch (error) {
-      console.error(`Could not start finetuning for ${functionDescription.name} using ${finetuneProvider}. Error: ${error}`)
+    } catch (error: any) {
+      console.error(
+        `Could not start finetuning for ${
+          functionDescription.name
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
+        } using ${finetuneProvider}. Error: ${error.toString()}`
+      );
     }
   }
 
-  async checkFinetuningStatus(funcHash: string, functionDescription: FunctionDescription): Promise<void> {
+  async checkFinetuningStatus(
+    funcHash: string,
+    functionDescription: FunctionDescription
+  ): Promise<void> {
     const currentTrainingRun =
       this.functionConfigs[funcHash]?.currentTrainingRun;
     if (!currentTrainingRun) return;
@@ -717,9 +771,12 @@ export class FunctionModeler {
       jobId !== undefined
     ) {
       try {
-        const finetuneProvider = this.functionConfigs[funcHash].distilledModel.provider;
-        const provider = await this.apiManager.getProvider(finetuneProvider);
-        const response: FinetuneJob = await (provider.getFinetuned(jobId));
+        const finetuneProvider =
+          this.functionConfigs[funcHash].distilledModel.provider;
+        const provider = (await this.apiManager.getProvider(
+          finetuneProvider
+        )) as Finetunable;
+        const response: FinetuneJob = await provider.getFinetuned(jobId);
         this.functionConfigs[funcHash].currentTrainingRun.lastChecked =
           now.toISOString();
 
@@ -760,11 +817,16 @@ export class FunctionModeler {
       this.functionConfigs[funcHash].nrOfTrainingRuns++;
       this.functionConfigs[funcHash].currentTrainingRun = {};
     }
-    console.info(`Finetuning for ${functionDescription.name} using ${this.functionConfigs[funcHash].distilledModel.provider} finished with status: ${response.status}`)
+    console.info(
+      `Finetuning for ${functionDescription.name} using ${this.functionConfigs[funcHash].distilledModel.provider} finished with status: ${response.status}`
+    );
     try {
       this.updateConfigFile(funcHash);
-    } catch(err) {
-      console.error(`Could not update the function configuration file with the finetuned model for ${functionDescription.name}. Error: ${err}`)
+    } catch (err: any) {
+      console.error(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        `Could not update the function configuration file with the finetuned model for ${functionDescription.name}. Error: ${err.message}`
+      );
     }
   }
 }

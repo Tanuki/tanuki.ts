@@ -1,5 +1,5 @@
 import { FunctionExample } from '../models/functionExample';
-import { FunctionConfig } from "../models/functionConfig";
+import { FunctionConfig } from '../models/functionConfig';
 
 interface IDatasetWorker {
   loadExistingDatasets(): Record<string, Record<string, number>>;

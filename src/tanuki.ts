@@ -1,9 +1,5 @@
-import * as ts from 'typescript';
-import * as path from 'path';
-//import PatchFunctionCompiler from './patchFunctionCompiler';
 import { IDatasetWorker } from './trackers/IDatasetWorker';
 import FilesystemBufferedLogger from './trackers/filesystemBufferedLogger';
-import { OpenAIAPI } from './languageModels/openAIAPI';
 import { Register } from './register';
 import { LanguageModelManager } from './languageModels/languageModelManager';
 import EmbeddingModelManager from './languageModels/embeddingModelManager';
@@ -13,9 +9,11 @@ import { FunctionDescription } from './models/functionDescription';
 import FunctionModeler from './functionModeler';
 import * as dotenv from 'dotenv';
 import { FunctionType } from './models/functionType';
-import fs from 'fs';
-import { APIManager } from "./APIManager";
-import { DEFAULT_EMBEDDING_MODEL_NAME, DEFAULT_TEACHER_MODEL_NAMES } from "./constants";
+import { APIManager } from './APIManager';
+import {
+  DEFAULT_EMBEDDING_MODEL_NAME,
+  DEFAULT_TEACHER_MODEL_NAMES,
+} from './constants';
 dotenv.config();
 
 type ExpectFunctionType = (actual: any) => {
@@ -39,7 +37,7 @@ type ItFunctionType = (
 // Set up basic configuration
 const logger: IDatasetWorker = new FilesystemBufferedLogger();
 
-const apiManager= new APIManager();
+const apiManager = new APIManager();
 // currently only use buffered logger as default
 const functionModeler = new FunctionModeler(logger, apiManager);
 Register.loadFunctions();
@@ -49,10 +47,7 @@ const languageModeler = new LanguageModelManager(
   512,
   apiManager
 );
-const embeddingModeler = new EmbeddingModelManager(
-  functionModeler,
-  apiManager
-);
+const embeddingModeler = new EmbeddingModelManager(functionModeler, apiManager);
 //const telemetryEnabled: boolean = true
 const validator = new Validator();
 
@@ -122,8 +117,8 @@ export class Tanuki {
         expected,
         equal,
       }: {
-        actual: { functionDescription: FunctionDescription; input: any };
-        expected: any;
+        actual: { functionDescription: FunctionDescription; input: any[] };
+        expected: { functionDescription: FunctionDescription; input: any[] };
         equal: boolean;
       }) {
         const functionDescription =
@@ -156,10 +151,19 @@ export class Tanuki {
           }
         }
       }
-      const expect: ExpectFunctionType = (actual) => {
-        const baseExpectation = async (expected: any, equal: boolean) => {
-          const awaitedActual = await actual;
-          if (awaitedActual.functionDescription.type !== FunctionType.SYMBOLIC && awaitedActual.functionDescription !== expected.functionDescription) {
+      const expect: ExpectFunctionType = actual => {
+        const baseExpectation = async (
+          expected: any, //{ functionDescription: FunctionDescription; input: any[] },
+          equal: boolean
+        ) => {
+          const awaitedActual: {
+            functionDescription: FunctionDescription;
+            input: any[];
+          } = await actual;
+          if (
+            awaitedActual.functionDescription.type !== FunctionType.SYMBOLIC &&
+            awaitedActual.functionDescription !== expected.functionDescription
+          ) {
             throw new Error(
               'Expected embedding function descriptions to match, but they did not. Embeddable functions must be aligned with invocations of the same function in order to train the embedding space.'
             );
@@ -191,11 +195,9 @@ export class Tanuki {
       };
 
       const testResult = new Promise((resolve, reject) => {
-        Promise.resolve(testFn(expect))
-          .then(resolve)
-          .catch(reject);
+        Promise.resolve(testFn(expect)).then(resolve).catch(reject);
       });
-      if (testResult && typeof testResult.then === 'function') {
+      if (typeof testResult.then === 'function') {
         testPromises.push(testResult);
       }
     };
@@ -205,16 +207,22 @@ export class Tanuki {
     return Promise.allSettled(testPromises).then(results => {
       Tanuki.isAlignActive = false;
       // Check if any of the promises were rejected and throw an error if so
-      const rejectedResult = results.find(result => result.status === 'rejected');
+      const rejectedResult = results.find(
+        result => result.status === 'rejected'
+      );
       if (rejectedResult) {
-        throw "reason" in rejectedResult ? rejectedResult.reason : rejectedResult
+        throw 'reason' in rejectedResult
+          ? rejectedResult.reason
+          : rejectedResult;
       }
     });
   }
 }
 
 export function patch<OutputType, InputType>(config?: PatchConfig) {
-  return (strings: TemplateStringsArray, ...expressions: any[]) => {
+  return (strings: TemplateStringsArray) => {
+    //...expressions: any[] -> Expressions make our functions less idempotent
+
     // Extract the prompt (instruction) from the template literal
     const docstring = strings.join('');
 
@@ -223,9 +231,16 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
     }
 
     // Return a function that takes an input of type InputType and returns a value of type OutputType
-    return async function(this: any, input: InputType): Promise<OutputType> {
-      const parentClass = this;
-      const functionDescription = Register.getNamedFunctions(parentClass, docstring);
+    return async function (
+      this: { name: string; sourceFile: string },
+      input: InputType
+    ): Promise<OutputType> {
+      // eslint-disable-next-line @typescript-eslint/no-this-alias
+      const parentClass = this; // Doing this for readability
+      const functionDescription = Register.getNamedFunctions(
+        parentClass,
+        docstring
+      );
 
       let embeddingCase = false;
       if (config) {
@@ -244,11 +259,17 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
       if (!config?.teacherModels) {
         config = {
           ...config,
-          teacherModels: embeddingCase ? [DEFAULT_EMBEDDING_MODEL_NAME] : DEFAULT_TEACHER_MODEL_NAMES
+          teacherModels: embeddingCase
+            ? [DEFAULT_EMBEDDING_MODEL_NAME]
+            : DEFAULT_TEACHER_MODEL_NAMES,
         };
       }
       if (config && config.teacherModels && config?.teacherModels?.length > 0) {
-          FunctionModeler.configureTeacherModels(config.teacherModels, functionDescription.hash(), functionDescription.type);
+        FunctionModeler.configureTeacherModels(
+          config.teacherModels,
+          functionDescription.hash(),
+          functionDescription.type
+        );
       }
 
       // Flag that we are within a tanuki.align block
@@ -263,15 +284,15 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
       if (embeddingCase) {
         return (await embeddingModeler.call(
           input,
-          functionDescription,
-          validator,
+          functionDescription
+          //validator,
         )) as unknown as OutputType;
       } else {
         const response = (await languageModeler.call(
           input,
           functionDescription,
           validator,
-          config.generationParams
+          config.generationParams ?? {}
         )) as unknown as OutputType;
 
         return response;
@@ -280,10 +301,13 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
   };
 }
 
+/*
 export function getCallerInfo(availableFunctionPaths: string[]): string {
   // availableFunctionPaths is an array of function names with their parent objects prepended.
   // We need to just get the function name, so we split on the '.' and take the last element.
-  const availableFunctionNames = availableFunctionPaths.map((path) => path.split('.').pop() as string);
+  const availableFunctionNames = availableFunctionPaths.map(
+    path => path.split('.').pop() as string
+  );
   try {
     // Throw an error and catch it to access the stack trace
     throw new Error();
@@ -297,7 +321,6 @@ export function getCallerInfo(availableFunctionPaths: string[]): string {
         // Use a regular expression to extract a potential function name
         const match = /at\s+([^\s]+)\s+/.exec(line);
         if (match && match[1]) {
-
           // Check if extracted name is in the list of available function names
           path = match.input?.split('(')[1].split(')')[0];
           const functionName_ = match[1].split('.').pop(); // Extracting function name
@@ -309,7 +332,9 @@ export function getCallerInfo(availableFunctionPaths: string[]): string {
       if (functionName !== '') {
         for (const line of stackLines) {
           // Use a regular expression to extract a potential function name
-          const matchForParentObject = /\s+at\s(\w+)\.apply\s\[as\s+/.exec(line);
+          const matchForParentObject = /\s+at\s(\w+)\.apply\s\[as\s+/.exec(
+            line
+          );
           if (matchForParentObject && matchForParentObject[1]) {
             // Check to see if functionName is in matchForParentObject[1]
             if (matchForParentObject.input.includes(functionName)) {
@@ -327,4 +352,4 @@ export function getCallerInfo(availableFunctionPaths: string[]): string {
   }
   return '';
 }
-
+*/
