@@ -1,4 +1,7 @@
 import { patch, Tanuki } from "../../src/tanuki";
+import {OpenAIAPI} from "../../src/languageModels/openAIAPI";
+import {TogetherAIAPI} from "../../src/languageModels/togetherAIAPI";
+
 
 class TogetherSentimentClassifier {
     static classifySentiment2 = patch<"Good" | "Bad" | null, [string, string]>({
@@ -17,6 +20,18 @@ class TogetherSentimentClassifier {
 }
 
 describe('Sentiment Analysis Tests for OpenChat', () => {
+    beforeEach(() => {
+        // @ts-ignore
+        TogetherAIAPI.prototype.checkApiKey = jest.fn().mockImplementation(() => {/* No operation, preventing exceptions */});
+        TogetherAIAPI.prototype.generate = jest.fn()
+            .mockImplementationOnce(async () => "null")
+            .mockImplementationOnce(async () => "Good")
+            .mockImplementationOnce(async () => "Bad")
+            .mockImplementationOnce(async () => "Good")
+            .mockImplementationOnce(async () => "Bad")
+            .mockImplementationOnce(async () => "null");
+
+    })
 
     it('align_classify_sentiment', async () => {
         Tanuki.align(async (it) => {

@@ -199,10 +199,16 @@ export class Register {
 
     // If more than one function is found, throw an error
     if (allFunctions.length > 1) {
-      throw new Error(`Multiple functions with name "${className}" and docstring "${docstring}" found.`);
+      throw new Error(`Multiple functions in class "${className}" with instruction "${docstring}" found.`);
     }
     // If no function is found, throw an error
     if (allFunctions.length === 0) {
+      if (className === undefined && classContext.name === undefined) {
+        throw new Error(`Function not resolved. Ensure your Tanuki functions are static class members. Ref:${docstring} not found.`);
+      }
+      if (classContext.sourceFile === undefined) {
+        throw new Error(`Function with name "${className}" and docstring "${docstring}" not found in class "${classContext.name}". Ensure you build your functions with the Tanuki compiler. Ref: "${docstring}"`);
+      }
       throw new Error(`Function with name "${className}" and docstring "${docstring}" not found in class "${classContext.name}". Check source file: "${classContext.sourceFile}"`);
     }
     return allFunctions[0]
@@ -221,7 +227,7 @@ export class Register {
     //
     // return [...symbolicFunctionNames, ...embeddingFunctionNames];
   }
-  static loadFunctionDescription(parentName: string, functionName: string, docString: string): FunctionDescription {
+  /*static loadFunctionDescription(parentName: string, functionName: string, docString: string): FunctionDescription {
     // Iterate over alignableSymbolicFunctions
     for (const key in this.alignableSymbolicFunctions) {
       if (this.alignableSymbolicFunctions[parentName][key].name === functionName && this.alignableSymbolicFunctions[parentName][key].docstring.trim() === docString.trim()) {
@@ -237,7 +243,7 @@ export class Register {
     }
     // If no match is found
     throw new Error(`FunctionDescription with name "${functionName}" and docString "${docString}" not found.`);
-  }
+  }*/
     /*const { name, docstring, inputTypeHints, outputTypeHint, type } = funcObject;
 
     const functionDescription: FunctionDescription = {

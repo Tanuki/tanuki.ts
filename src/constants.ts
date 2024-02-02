@@ -25,7 +25,7 @@ export const NEGATIVE_FILE_EXTENSION: NEGATIVE_FILE_EXTENSION_TYPE = '.negative'
 
 export const REGISTERED_FUNCTIONS_FILENAME = 'functions.jsonl';
 // Bloom filter default config
-export const EXPECTED_ITEMS = 10000
+export const EXPECTED_ITEMS = 1000000
 export const FALSE_POSITIVE_RATE = 0.01
 
 // The name of the library

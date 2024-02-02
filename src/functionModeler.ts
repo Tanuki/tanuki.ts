@@ -103,19 +103,27 @@ export class FunctionModeler {
   public static setConfig(functionDescription: FunctionDescription, config: PatchConfig) {
     const functionHash = functionDescription.hash();
     functionModeler.environmentId = config.environmentId ?? 0;
-
+    let message = `For ${functionDescription.name} [${functionHash}] the following configuration has been set:`
     if (config.ignoreFinetuning) {
       functionModeler.executeFinetuneBlacklist.add(functionHash);
-      console.info(`The flag for ignoring finetuning has been set True for ${functionDescription.name}. No model distillation will be performed.`)
+      message += `\n- [ ] Model distillation `
+    } else {
+      message += `\n- [x] Model distillation `
     }
+
     if (config.ignoreFinetuneFetching) {
       functionModeler.checkFinetuneBlacklist.add(functionHash);
-      console.info(`The flag for ignoring finetune fetching has been set True for ${functionDescription.name}. No already finetuned models will be looked for.`)
+      message += `\n- [ ] Use finetuned models`
+    } else {
+        message += `\n- [x] Use finetuned models`
     }
     if (config.ignoreDataStorage) {
       functionModeler.storeDataBlacklist.add(functionHash);
-      console.info(`The flag for ignoring data storage has been set True for ${functionDescription.name}. No data will be read or saved and model distillation will not be performed.`)
+      message += `\n- [ ] Runs cached for distillation fine-tuning`
+    } else {
+      message += `\n- [x] Runs cached for distillation fine-tuning`
     }
+    console.info(message)
   }
   private getDatasetInfo(
     datasetType: string,
@@ -139,13 +147,14 @@ export class FunctionModeler {
     // Prepare args and kwargs for saving
     const parsedArgs = this.prepareObjectForSaving(args);
 
-    // Prepare positive and negative pairs for saving
-    const parsedPositivePairs = positivePairs.map(pair =>
-      this.prepareObjectForSaving(pair)
-    );
-    const parsedNegativePairs = negativePairs.map(pair =>
-      this.prepareObjectForSaving(pair)
-    );
+    try {
+      // Prepare positive and negative pairs for saving
+      const parsedPositivePairs = positivePairs.map(pair =>
+          this.prepareObjectForSaving(pair)
+      );
+      const parsedNegativePairs = negativePairs.map(pair =>
+          this.prepareObjectForSaving(pair)
+      );
 
     // Save the contrastive pairs
     parsedPositivePairs.forEach(pair => {
@@ -154,6 +163,10 @@ export class FunctionModeler {
     parsedNegativePairs.forEach(pair => {
       this.saveContrastiveAlignmentPair(functionHash, parsedArgs, pair, false);
     });
+    } catch (error) {
+        console.error('Error saving embeddable alignments', error);
+        throw error;
+    }
   }
 
   private saveContrastiveAlignmentPair(
@@ -377,7 +390,7 @@ export class FunctionModeler {
   ): Promise<FunctionConfig> {
     const [config, defaultUsed] = this.dataWorker.loadFunctionConfig(funcHash)
     const finetuneProvider: string = config.distilledModel.provider
-    if (defaultUsed && !functionModeler.checkFinetuneBlacklist.has(funcHash)) {
+    if (defaultUsed && !FunctionModeler.checkFinetuneBlacklist.has(funcHash)) {
       const [finetuned, finetuneConfig] = await this.checkForFinetunes(
         functionDescription,
         finetuneProvider
@@ -399,8 +412,9 @@ export class FunctionModeler {
     finetuneProvider: string
   ): Promise<[boolean, FunctionConfig]> {
     console.info(`Checking for finetunes for ${functionDescription.name} using ${finetuneProvider}`)
+    const environmentId = encodeInt(functionModeler.environmentId) || "";
     const finetuneHash =
-      functionDescription.hash('finetune') + encodeInt(functionModeler.environmentId);
+      functionDescription.hash('finetune') + environmentId.trim();
     const finetunes: FinetuneJob[] = await (await this.apiManager.getProvider(
       finetuneProvider
     )).listFinetuned(1000);
@@ -543,7 +557,7 @@ export class FunctionModeler {
     try {
       const currentTrainingRun =
         this.functionConfigs[funcHash]?.currentTrainingRun;
-      if (currentTrainingRun && 'job_id' in currentTrainingRun) {
+      if (currentTrainingRun && currentTrainingRun.jobId !== undefined) {
         await this.checkFinetuningStatus(funcHash, functionDescription);
       } else if (this.checkFinetuningCondition(funcHash, functionDescription)) {
         await this.executeFinetuning(functionDescription, funcHash);
@@ -618,12 +632,13 @@ export class FunctionModeler {
       return;
     }
 
-    const dataset = (alignDataset + patchDataset)
+    const datasetStrings = (alignDataset + patchDataset)
       .replace(/\\n/g, '[SEP_TOKEN]')
       .split('\n')
       .map(x => x.replace('[SEP_TOKEN]', '\\n'))
       .filter(x => x !== '')
-      .map(x => JSON.parse(x) as FunctionExample);
+
+     const dataset = datasetStrings.map(x => JSON.parse(x) as FunctionExample);
 
     const instruction = "You are given below a function description and input data. The function description of what the function must carry out can be found in the Function section, with input and output type hints. The input data can be found in Input section. Using the function description, apply the function to the Input and return a valid output type, that is acceptable by the outputClassDefinition and outputClassHint. Return null if you can't apply the function to the input or if the output is optional and the correct output is null.\nINCREDIBLY IMPORTANT: Only output a JSON-compatible string in the correct response format."
 
@@ -671,9 +686,8 @@ export class FunctionModeler {
 
     try {
       console.info(`Starting finetuning for ${functionDescription.name} using ${finetuneProvider}`)
-      const finetuningResponse: FinetuneJob = await(await this.apiManager.getProvider(
-        finetuneProvider
-      )).finetune(datasetBuffer, finetuneHash);
+      const provider = await this.apiManager.getProvider(finetuneProvider);
+      const finetuningResponse: FinetuneJob = await provider.finetune(datasetBuffer, finetuneHash);
 
       this.functionConfigs[funcHash].currentTrainingRun = {
         jobId: finetuningResponse.id,
@@ -704,9 +718,8 @@ export class FunctionModeler {
     ) {
       try {
         const finetuneProvider = this.functionConfigs[funcHash].distilledModel.provider;
-        const response: FinetuneJob = await (await this.apiManager.getProvider(
-          finetuneProvider
-        )).getFinetuned(jobId);
+        const provider = await this.apiManager.getProvider(finetuneProvider);
+        const response: FinetuneJob = await (provider.getFinetuned(jobId));
         this.functionConfigs[funcHash].currentTrainingRun.lastChecked =
           now.toISOString();
 

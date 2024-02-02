@@ -158,14 +158,15 @@ export class Tanuki {
       }
       const expect: ExpectFunctionType = (actual) => {
         const baseExpectation = async (expected: any, equal: boolean) => {
-          if (actual.functionDescription.type !== FunctionType.SYMBOLIC && actual.functionDescription !== expected.functionDescription) {
+          const awaitedActual = await actual;
+          if (awaitedActual.functionDescription.type !== FunctionType.SYMBOLIC && awaitedActual.functionDescription !== expected.functionDescription) {
             throw new Error(
-              'Expected function descriptions to match, but they did not. Embeddable functions can only be aligned with invocations of the same function.'
+              'Expected embedding function descriptions to match, but they did not. Embeddable functions must be aligned with invocations of the same function in order to train the embedding space.'
             );
           }
 
           handleAlignStatement({
-            actual: await actual,
+            actual: awaitedActual,
             expected: expected,
             equal: equal,
           });
@@ -247,7 +248,7 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
         };
       }
       if (config && config.teacherModels && config?.teacherModels?.length > 0) {
-        FunctionModeler.configureTeacherModels(config.teacherModels, functionDescription.hash(), functionDescription.type);
+          FunctionModeler.configureTeacherModels(config.teacherModels, functionDescription.hash(), functionDescription.type);
       }
 
       // Flag that we are within a tanuki.align block

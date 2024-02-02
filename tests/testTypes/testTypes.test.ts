@@ -6,14 +6,14 @@ export enum Sentiment {
   Bad = "Bad",
 }
 
-class Classifier {
-  classifySentimentEnum3 = patch<Sentiment, string>()`Classify input objects`;
+class TypeClassifier {
+  static classifySentimentEnum3 = patch<Sentiment, string>()`Classify input objects`;
 }
-describe('Sentiment Analysis Tests', () => {
+describe('Typing Tests', () => {
 
   it('test_classify_sentiment_with_enum', async() => {
     const goodInput = "I really really like you";
-    const result = await new Classifier().classifySentimentEnum3(goodInput);
+    const result = await TypeClassifier.classifySentimentEnum3(goodInput);
     expect(result).toEqual(Sentiment.Good);
   });
 });
