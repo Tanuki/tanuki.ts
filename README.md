@@ -1,4 +1,5 @@
-# Tanuki <span style="font-family:Papyrus; font-size:2em;">🦝</span> ![Discord](https://img.shields.io/discord/1168948553222197248)
+# Tanuki <span style="font-family:Papyrus; font-size:2em;">🦝</span> ![Discord](https://img.shields.io/discord/1168948553222197248) [![codecov](https://codecov.io/gh/Tanuki/tanuki.ts/branch/main/graph/badge.svg?token=b169ecba-fa1c-43ee-a9e0-18597d2aaffa)](https://codecov.io/gh/Tanuki/tanuki.ts)
+
 Easily build LLM-powered apps that get cheaper and faster over time.
 
 ---
