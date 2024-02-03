@@ -1,29 +1,23 @@
-// Assuming the necessary imports and utilities are available in your environment
-// import { BloomFilter } from '...';
-// import { IBloomFilterPersistence } from '...';
-// Other necessary imports...
-/*
- */
 import * as fs from 'fs';
 import BloomFilter from '../bloomFilter';
 import IBloomFilterPersistence from '../persistence/iBloomFilterPersistence';
 import { FunctionExample } from '../models/functionExample';
 import { IDatasetWorker } from './IDatasetWorker';
-import { FunctionConfig } from "../models/functionConfig";
+import { FunctionConfig } from '../models/functionConfig';
 import {
-  ALIGN_FILE_EXTENSION, DEFAULT_DISTILLED_MODEL_NAME, DEFAULT_TEACHER_MODELS, DEFAULT_TEACHER_MODEL_NAMES,
+  ALIGN_FILE_EXTENSION,
+  DEFAULT_DISTILLED_MODEL_NAME,
+  DEFAULT_TEACHER_MODELS,
   EXPECTED_ITEMS,
   FALSE_POSITIVE_RATE,
   NEGATIVE_FILE_EXTENSION,
   PATCH_FILE_EXTENSION,
-  POSITIVE_FILE_EXTENSION, DEFAULT_STUDENT_MODELS
-} from "../constants";
-import { ModelConfigFactory } from "../languageModels/llmConfigs/modelConfigFactory";
-//import { FunctionConfig } from "../models/functionConfig";
-
+  POSITIVE_FILE_EXTENSION,
+  DEFAULT_STUDENT_MODELS,
+} from '../constants';
+import { ModelConfigFactory } from '../languageModels/llmConfigs/modelConfigFactory';
 abstract class AbstractBufferedLogger implements IDatasetWorker {
   private buffers: Record<string, Buffer>;
-  private mappedFiles: Record<string, string>;
   missCount: number;
   hitCount: number;
   private flushLimit: Record<string, number>;
@@ -38,16 +32,12 @@ abstract class AbstractBufferedLogger implements IDatasetWorker {
     currentModelStats: { trainedOnDatapoints: 0, runningFaults: [] },
     lastTrainingRun: { jobId: '', trainedOnDatapoints: 0, lastChecked: '' },
     currentTrainingRun: { jobId: '', trainedOnDatapoints: 0, lastChecked: '' },
-    teacherModels: DEFAULT_TEACHER_MODEL_NAMES.map(teacherModelName => {
-      // @ts-ignore
-      return DEFAULT_TEACHER_MODELS[teacherModelName];
-    }),
+    teacherModels: Object.values(DEFAULT_TEACHER_MODELS),
     nrOfTrainingRuns: 0,
   };
 
   constructor() {
     this.buffers = {};
-    this.mappedFiles = {};
     this.missCount = 0;
     this.hitCount = 0;
     this.flushLimit = {};
@@ -183,8 +173,8 @@ abstract class AbstractBufferedLogger implements IDatasetWorker {
 
   public logSymbolicAlign(
     funcHash: string,
-    example: FunctionExample,
-    ...args: any[]
+    example: FunctionExample
+    //...args: any[]
   ): [boolean, boolean] {
     let successfullySaved = false;
     let newDatapoint = false;
@@ -219,7 +209,7 @@ abstract class AbstractBufferedLogger implements IDatasetWorker {
   public logSymbolicPatch(
     funcHash: string,
     example: any
-  ): Record<string, number | never> {
+  ): Record<string, number> {
     const exampleData = Buffer.from(JSON.stringify(example) + '\n', 'utf-8');
 
     const bloomFilterRepresentation = `${funcHash}_${exampleData.toString()}`;
@@ -335,10 +325,12 @@ abstract class AbstractBufferedLogger implements IDatasetWorker {
       if (!this.doesObjectExist(configPath)) {
         functionConfig = this.defaultFunctionConfig;
         defaultUsed = true;
-        functionConfig.teacherModels = []
+        functionConfig.teacherModels = [];
         this.writeJson(configPath, functionConfig);
       } else {
-        functionConfig = ModelConfigFactory.loadFunctionConfigFromDict(this.readJson(configPath));
+        functionConfig = ModelConfigFactory.loadFunctionConfigFromDict(
+          this.readJson(configPath)
+        );
       }
     } catch (error) {
       functionConfig = this.defaultFunctionConfig;
@@ -358,8 +350,7 @@ abstract class AbstractBufferedLogger implements IDatasetWorker {
     try {
       this.writeJson(configPath, configToBeSaved);
     } catch (error) {
-      // Optionally handle the error or log it
-      // e.g., console.error("Error saving function config:", error);
+      console.error('Error saving function config:', error);
     }
   }
 

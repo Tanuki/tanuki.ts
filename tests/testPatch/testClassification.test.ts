@@ -1,8 +1,11 @@
 import { patch, Tanuki } from "../../src/tanuki";
 
-class Classifier {
-  static classifySentiment2 = patch<"Good" | "Bad", [string, string]>()`The sentiment of the input objects`;
-  static classifySentiment = patch< "Good" | "Bad", string>()`Classify input objects`;
+class ClassifierSentiment {
+  static classifySentimentPair = patch<"Good" | "Bad", [string, string]>()
+      `Classify a list of input objects into a single Good, Bad, or null sentiment`;
+
+  static classifySentiment = patch< "Good" | "Bad", string>()
+      `Classify input objects`;
 }
 describe('Sentiment Analysis Tests', () => {
 
@@ -10,19 +13,19 @@ describe('Sentiment Analysis Tests', () => {
   it('align_classify_sentiment', async () => {
     Tanuki.align(async (it) => {
       it("Specify how our functions should behave.", async (expect) => {
-        expect(await Classifier.classifySentiment2(["I love you", "I love woo"])).toEqual('Good');
-        expect(await Classifier.classifySentiment2(["I hate you", "You're disgusting"])).toEqual('Bad');
-        expect(await Classifier.classifySentiment2(["Today is wednesday", "The dogs are running outside"])).toBeNull();
+        expect(await ClassifierSentiment.classifySentimentPair(["I love you", "I love woo"])).toEqual('Good');
+        expect(await ClassifierSentiment.classifySentimentPair(["I hate you", "You're disgusting"])).toEqual('Bad');
+        expect(await ClassifierSentiment.classifySentimentPair(["Today is wednesday", "The dogs are running outside"])).toBeNull();
 
-        expect(await Classifier.classifySentiment("I love you")).toEqual('Good');
-        expect(await Classifier.classifySentiment("I hate you")).toEqual('Bad');
-        expect(await Classifier.classifySentiment("Wednesdays are in the middle of the week")).toBeNull();
+        expect(await ClassifierSentiment.classifySentiment("I love you")).toEqual('Good');
+        expect(await ClassifierSentiment.classifySentiment("I hate you")).toEqual('Bad');
+        expect(await ClassifierSentiment.classifySentiment("Wednesdays are in the middle of the week")).toBeNull();
       })
     })
   });
 
   it('test_classify_sentiment', async() => {
-    const result = await Classifier.classifySentiment("I like you");
+    const result = await ClassifierSentiment.classifySentiment("I like you");
     expect(result).toEqual("Good");
   });
 });

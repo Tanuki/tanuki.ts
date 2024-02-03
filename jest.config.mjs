@@ -3,12 +3,13 @@ export default {
   testEnvironment: 'node',
   testMatch: ['**/tests/**/*.spec.ts', '**/tests/**/*.test.ts', '**/tests/*.spec.ts', '**/tests/*.test.ts'],
   transform: {
-    '^.+\\.tsx?$': 'babel-jest'
+    '^.+\\.tsx?$': 'ts-jest'
   },
   extensionsToTreatAsEsm: ['.ts'],
   collectCoverageFrom: [
     '<rootDir>/src/**/*.ts',
     '!<rootDir>/src/types/**/*.ts',
+    '!<rootDir>/src/models/**/*.ts',
   ],
   globals: {
     'ts-jest': {
@@ -17,7 +18,7 @@ export default {
       useESM: true,
     },
   },
-  moduleNameMapper: {
-    '^(\\.{1,2}/.*)\\.js$': '$1',
-  },
+  //moduleNameMapper: {
+   // '^(\\.{1,2}/.*)\\.js$': '$1',
+  //},
 };

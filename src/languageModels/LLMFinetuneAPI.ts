@@ -1,4 +1,4 @@
-import { FinetuneJob } from "../models/finetuneJob";
+import { FinetuneJob } from '../models/finetuneJob';
 
 abstract class LLMFinetuneAPI {
   abstract listFinetuned(limit: number, ...args: any[]): Promise<FinetuneJob[]>;

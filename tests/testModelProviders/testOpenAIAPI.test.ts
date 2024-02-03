@@ -2,6 +2,7 @@ import { OpenAIAPI } from "../../src/languageModels/openAIAPI";
 import { OpenAIConfig } from "../../src/languageModels/llmConfigs/openAIConfig";
 import { OpenAI } from "openai";
 import { PermissionDeniedError } from "openai/error";
+import {FineTuningJob} from "openai/src/resources/fine-tuning/jobs";
 
 jest.mock('openai', () => {
   const mockOpenAI = {
@@ -84,7 +85,7 @@ describe('TestOpenAIAPI', () => {
         validation_file: "bla",
         model: "bla",
         organization_id: "b",
-      }
+      } as FineTuningJob
     ];
 
     const openAIInstance = new OpenAI();

@@ -10,13 +10,19 @@ class BloomFilterFileSystemDriver implements IBloomFilterPersistence {
   }
 
   public save(bitArray: boolean[]): void {
-    const bloomFilterPath = path.join(this.logDirectory, 'bloom_filter_state.bin');
+    const bloomFilterPath = path.join(
+      this.logDirectory,
+      'bloom_filter_state.bin'
+    );
     const byteArray = this.booleanArrayToByteArray(bitArray);
     fs.writeFileSync(bloomFilterPath, Buffer.from(byteArray));
   }
 
   public load(): boolean[] {
-    const bloomFilterPath = path.join(this.logDirectory, 'bloom_filter_state.bin');
+    const bloomFilterPath = path.join(
+      this.logDirectory,
+      'bloom_filter_state.bin'
+    );
     const fileBuffer = fs.readFileSync(bloomFilterPath);
     return this.byteArrayToBooleanArray([...fileBuffer]);
   }
@@ -27,7 +33,7 @@ class BloomFilterFileSystemDriver implements IBloomFilterPersistence {
       let byte = 0;
       for (let j = 0; j < 8; j++) {
         if (i + j < bitArray.length && bitArray[i + j]) {
-          byte |= (1 << j);
+          byte |= 1 << j;
         }
       }
       byteArray.push(byte);

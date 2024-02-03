@@ -1,7 +1,6 @@
-import { BaseModelConfig } from "./llmConfigs/baseModelConfig";
+import { BaseModelConfig } from './llmConfigs/baseModelConfig';
 
 abstract class LLMApi {
-
   abstract generate(
     model: BaseModelConfig,
     systemMessage: string,

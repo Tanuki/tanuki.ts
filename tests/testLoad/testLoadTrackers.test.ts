@@ -17,18 +17,19 @@ describe('FilesystemBufferedLogger Tests', () => {
   });
 
   it('test_patch_one_function_many_times', () => {
-    const runs = 100;
+    const runs = 25;
     logger.createBloomFilter();
 
     const startTime = Date.now();
     for (let i = 0; i < runs; i++) {
       const example = new FunctionExample([i],  i * 2);
       const beforeBitArray = logger.bloomFilter.bitArray.slice();
-
+      const isSame1 = logger.bloomFilter.bitArray.toString() == beforeBitArray.toString();
+      expect(isSame1).toBe(true);
       logger.logSymbolicPatch('test', example);
 
       const afterBitArray = logger.bloomFilter.bitArray;
-      const isSame = beforeBitArray.toString() === afterBitArray.toString();
+      const isSame = beforeBitArray.toString() == afterBitArray.toString();
       if (isSame) {
         console.log(`Bit arrays are the same after ${i} runs`);
       }

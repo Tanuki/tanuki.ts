@@ -1,11 +1,11 @@
-import { FunctionDescription } from "./models/functionDescription";
-import { FunctionType } from "./models/functionType";
+import { FunctionDescription } from './models/functionDescription';
+import { FunctionType } from './models/functionType';
 //import { PatchFunctionCompiler } from "./tanukiTransformer";//"./patchFunctionCompiler";
-import fs from "fs";
-import path from "path";
-import { JSONSchema } from "./models/jsonSchema";
-import { PatchFunctionCompiler } from "./tanukiTransformer";
-import { REGISTERED_FUNCTIONS_FILENAME } from "./constants";
+import fs from 'fs';
+import path from 'path';
+import { JSONSchema } from './models/jsonSchema';
+import { PatchFunctionCompiler } from './tanukiTransformer';
+import { REGISTERED_FUNCTIONS_FILENAME } from './constants';
 
 interface FunctionDescriptionJSON {
   name: string;
@@ -25,9 +25,14 @@ const alignableSymbolicFunctions: Record<string, Function> = {};
 const alignableEmbeddingFunctions: Record<string, Function> = {};
 
 export class Register {
-
-  static alignableSymbolicFunctions: Record<string, FunctionDescription> = {};
-  static alignableEmbeddingFunctions: Record<string, FunctionDescription> = {};
+  static alignableSymbolicFunctions: Record<
+    string,
+    Record<string, FunctionDescription>
+  > = {};
+  static alignableEmbeddingFunctions: Record<
+    string,
+    Record<string, FunctionDescription>
+  > = {};
 
   static loadFunctions() {
     const distDirectory = PatchFunctionCompiler.getDistDirectory();
@@ -39,7 +44,7 @@ export class Register {
 
     // Define the input file path within the dist directory
     const inputPath = path.join(distDirectory, REGISTERED_FUNCTIONS_FILENAME);
-    let patchFunctions = []
+    const patchFunctions = [];
     if (!fs.existsSync(inputPath)) {
       throw new Error('JSON file does not exist.');
     }
@@ -53,7 +58,7 @@ export class Register {
           const obj = JSON.parse(line) as FunctionDescriptionJSON;
           patchFunctions.push(obj);
         } catch (e) {
-          console.error(`Error parsing line: ${e}`);
+          console.error('Error parsing line', line, e);
         }
       }
     }
@@ -90,9 +95,18 @@ export class Register {
         pfj.type ?? FunctionType.SYMBOLIC
       );
       if (pf.type === FunctionType.SYMBOLIC) {
-        this.alignableSymbolicFunctions[pf.name] = pf;
+        // Ensure the parentName key exists in the alignableSymbolicFunctions object
+        if (this.alignableSymbolicFunctions[pf.parentName || ''] == undefined) {
+          this.alignableSymbolicFunctions[pf.parentName || ''] = {};
+        }
+        this.alignableSymbolicFunctions[pf.parentName || ''][pf.name] = pf;
       } else if (pf.type === FunctionType.EMBEDDABLE) {
-        this.alignableEmbeddingFunctions[pf.name] = pf;
+        if (
+          this.alignableEmbeddingFunctions[pf.parentName || ''] == undefined
+        ) {
+          this.alignableEmbeddingFunctions[pf.parentName || ''] = {};
+        }
+        this.alignableEmbeddingFunctions[pf.parentName || ''][pf.name] = pf;
       }
     });
   }
@@ -143,7 +157,7 @@ export class Register {
     }
   }
 */
- /* static loadFunctionDescriptionFromName(funcName: string, instance?: any): FunctionDescription {
+  /* static loadFunctionDescriptionFromName(funcName: string, instance?: any): FunctionDescription {
     // eslint-disable-next-line @typescript-eslint/ban-types
     let func: Function;
 
@@ -170,38 +184,59 @@ export class Register {
     throw new Error("Method not implemented.");
   }*/
   // @ts-ignore
-  static getNamedFunctions(classContext, docstring: string): FunctionDescription {
+  static getNamedFunctions(
+    classContext: { name: string; sourceFile: string },
+    docstring: string
+  ): FunctionDescription {
     const className = classContext.name;
-    const classPrefix = className + '.';
 
-    // Gather all function names from alignable functions
-    const allFunctionNames = [
-      ...Object.keys(this.alignableSymbolicFunctions),
-      ...Object.keys(this.alignableEmbeddingFunctions)
-    ];
+    const filterFunctions = (
+      functions: Record<string, Record<string, FunctionDescription>>
+    ) => {
+      // Check if the key exists in the object and is not undefined/null
+      const classFunctions = functions[className || ''] || {};
+      const values = Object.values(classFunctions);
 
-    const filterFunctions = (functions: { // @ts-ignore
-      [p: string]: FunctionDescription }) => {
-      return Object.values(functions)
-          .filter(funcDesc => funcDesc.parentName === classContext.name)
-          .filter(funcDesc => docstring === "" || funcDesc.docstring === docstring)
-          .map(funcDesc => funcDesc);
+      return values
+        .filter(funcDesc => funcDesc.parentName === classContext.name)
+        .filter(
+          funcDesc => docstring === '' || funcDesc.docstring === docstring
+        )
+        .map(funcDesc => funcDesc);
     };
 
     // Apply the filter to both symbolic and embedding functions
-    const symbolicFunctionNames = filterFunctions(this.alignableSymbolicFunctions);
-    const embeddingFunctionNames = filterFunctions(this.alignableEmbeddingFunctions);
+    const symbolicFunctionNames = filterFunctions(
+      this.alignableSymbolicFunctions
+    );
+    const embeddingFunctionNames = filterFunctions(
+      this.alignableEmbeddingFunctions
+    );
     const allFunctions = [...symbolicFunctionNames, ...embeddingFunctionNames];
 
     // If more than one function is found, throw an error
     if (allFunctions.length > 1) {
-      throw new Error(`Multiple functions with name "${className}" and docstring "${docstring}" found.`);
+      throw new Error(
+        `Multiple functions in class "${className}" with instruction "${docstring}" found.`
+      );
     }
     // If no function is found, throw an error
     if (allFunctions.length === 0) {
-      throw new Error(`Function with name "${className}" and docstring "${docstring}" not found in class "${classContext.name}". Check source file: "${classContext.sourceFile}"`);
+      if (className === undefined && classContext.name === undefined) {
+        throw new Error(
+          `Function not resolved. Ensure your Tanuki functions are static class members. Ref:${docstring} not found.`
+        );
+      }
+      if (classContext.sourceFile === undefined) {
+        throw new Error(
+          `Function with name "${className}" and docstring "${docstring}" not found in class "${classContext.name}". Ensure you build your functions with the Tanuki compiler. Ref: "${docstring}"`
+        );
+      }
+      throw new Error(
+        `Function with name "${className}" and docstring "${docstring}" not found in class "${classContext.name}". Check source file: "${classContext.sourceFile}"`
+      );
     }
-    return allFunctions[0]
+    return allFunctions[0];
 
     // Filter by the members of the classContext
     // const memberFunctionNames = allFunctionNames.filter(name =>
@@ -217,24 +252,24 @@ export class Register {
     //
     // return [...symbolicFunctionNames, ...embeddingFunctionNames];
   }
-  static loadFunctionDescription(functionName: string, docString: string): FunctionDescription {
+  /*static loadFunctionDescription(parentName: string, functionName: string, docString: string): FunctionDescription {
     // Iterate over alignableSymbolicFunctions
     for (const key in this.alignableSymbolicFunctions) {
-      if (this.alignableSymbolicFunctions[key].name === functionName && this.alignableSymbolicFunctions[key].docstring.trim() === docString.trim()) {
-        return this.alignableSymbolicFunctions[key];
+      if (this.alignableSymbolicFunctions[parentName][key].name === functionName && this.alignableSymbolicFunctions[parentName][key].docstring.trim() === docString.trim()) {
+        return this.alignableSymbolicFunctions[parentName][key];
       }
     }
 
     // Iterate over alignableEmbeddingFunctions
     for (const key in this.alignableEmbeddingFunctions) {
-      if (this.alignableEmbeddingFunctions[key].name === functionName && this.alignableEmbeddingFunctions[key].docstring.trim() === docString.trim()) {
-        return this.alignableEmbeddingFunctions[key];
+      if (this.alignableEmbeddingFunctions[parentName][key].name === functionName && this.alignableEmbeddingFunctions[parentName][key].docstring.trim() === docString.trim()) {
+        return this.alignableEmbeddingFunctions[parentName][key];
       }
     }
     // If no match is found
     throw new Error(`FunctionDescription with name "${functionName}" and docString "${docString}" not found.`);
-  }
-    /*const { name, docstring, inputTypeHints, outputTypeHint, type } = funcObject;
+  }*/
+  /*const { name, docstring, inputTypeHints, outputTypeHint, type } = funcObject;
 
     const functionDescription: FunctionDescription = {
       name: name,
@@ -247,7 +282,6 @@ export class Register {
     };
 
     return functionDescription;*/
-
 
   // Load function description methods would be more complex, as TypeScript doesn't support the same level of reflection as Python
   // You might need a different approach based on your application's requirements

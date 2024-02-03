@@ -1,4 +1,4 @@
-import { EmbeddingDataType } from "./embeddingDataType";
+import { EmbeddingDataType } from './embeddingDataType';
 
 export class Embedding<T> {
   private _data: EmbeddingDataType<T>;
@@ -10,7 +10,7 @@ export class Embedding<T> {
     } else if (data instanceof Float32Array || data instanceof Float64Array) {
       this._data = data;
     } else {
-      throw new TypeError("Unsupported data type for embedding");
+      throw new TypeError('Unsupported data type for embedding');
     }
   }
 
@@ -35,5 +35,4 @@ export class Embedding<T> {
   public toString(): string {
     return this._data.toString();
   }
-
 }

@@ -1,13 +1,12 @@
 import FunctionModeler from '../functionModeler';
 import { FunctionDescription } from '../models/functionDescription';
 import { FunctionExample } from '../models/functionExample';
-import LLMApi from './LLMApi';
 import { approximateTokenCount } from '../utils';
 import { Validator } from '../validator';
-import { LanguageModelOutput } from "../models/languageModelOutput";
+import { LanguageModelOutput } from '../models/languageModelOutput';
 import { JSONSchema } from '../models/jsonSchema';
-import { BaseModelConfig } from "./llmConfigs/baseModelConfig";
-import { APIManager } from "../APIManager";
+import { BaseModelConfig } from './llmConfigs/baseModelConfig';
+import { APIManager, Inferable } from '../APIManager';
 
 interface Model {
   tokenLimit: number;
@@ -32,7 +31,7 @@ export class LanguageModelManager {
     generationTokenLimit: number,
     apiProviders: APIManager
   ) {
-    this.defaultGenerationLength = generationTokenLimit
+    this.defaultGenerationLength = generationTokenLimit;
     this.initializedFunctions = new Map<string, any>();
     this.apiProviders = apiProviders;
     this.functionModeler = functionModeler;
@@ -64,12 +63,11 @@ export class LanguageModelManager {
   }
 
   public async call(
-    args: any,
+    args: any[],
     functionDescription: FunctionDescription,
     validator: Validator,
     generationParameters: Record<string, any> = {}
   ): Promise<any> {
-
     if (generationParameters.max_new_tokens === undefined) {
       generationParameters.max_new_tokens = this.defaultGenerationLength;
     }
@@ -87,17 +85,16 @@ export class LanguageModelManager {
     );
 
     if (!isValid) {
-      const { choice, successfulRepair } =
-        await this.repairOutput(
-          args,
-          functionDescription,
-          output.generatedResponse,
-          validator,
-          generationParameters
-        );
+      const { choice, successfulRepair } = await this.repairOutput(
+        args,
+        functionDescription,
+        output.generatedResponse,
+        validator,
+        generationParameters
+      );
 
       if (!successfulRepair) {
-        const typeString = functionDescription.outputTypeDefinition ?? "null";
+        const typeString = functionDescription.outputTypeDefinition ?? 'null';
         throw new TypeError(
           `Output type was not valid. Expected an object of type ${typeString}, got '${output.generatedResponse}'`
         );
@@ -126,7 +123,7 @@ export class LanguageModelManager {
       choiceParsed
     )*/
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return choiceParsed ;
+    return choiceParsed;
   }
 
   private parseChoice(output: LanguageModelOutput): any {
@@ -149,29 +146,43 @@ export class LanguageModelManager {
     //const funcHash = functionDescription.hash();
 
     const { prompt, model, saveToFinetune, isDistilledModel } =
-      await this.getGenerationCase(args, functionDescription, llmParameters, funcHash);
+      await this.getGenerationCase(
+        args,
+        functionDescription,
+        llmParameters,
+        funcHash
+      );
 
-
-    let currentFunctionSetup = this.initializedFunctions.get(funcHash);
+    const currentFunctionSetup = this.initializedFunctions.get(funcHash) as {
+      model: string;
+      examples: string[];
+    };
     if (currentFunctionSetup) {
-      let generatorModel = currentFunctionSetup.model;
+      const generatorModel = currentFunctionSetup.model;
       if (isDistilledModel) {
-        generatorModel = currentFunctionSetup.model;
-        console.info(`Generating function outputs for ${functionDescription.name} with a finetuned model: ${model.modelName}.`)
-      } else if (generatorModel === "") {
-        console.info(`Found ${currentFunctionSetup.examples.length} align statements for ${functionDescription.name}. Generating function outputs with ${model.modelName}.`);
-        this.initializedFunctions.set(funcHash, { ...currentFunctionSetup, model: model.modelName });
+        console.info(
+          `Generating function outputs for ${functionDescription.name} with a finetuned model: ${model.modelName}.`
+        );
+      } else if (generatorModel === '') {
+        console.info(
+          `Found ${currentFunctionSetup.examples.length} align statements for ${functionDescription.name}. Generating function outputs with ${model.modelName}.`
+        );
+        this.initializedFunctions.set(funcHash, {
+          ...currentFunctionSetup,
+          model: model.modelName,
+        });
       } else if (generatorModel !== model.modelName) {
-        console.info(`Switching output generation from ${generatorModel} to ${model.modelName} for function ${functionDescription.name}.`);
-        this.initializedFunctions.set(funcHash, { ...currentFunctionSetup, model: model.modelName });
+        console.info(
+          `Switching output generation from ${generatorModel} to ${model.modelName} for function ${functionDescription.name}.`
+        );
+        this.initializedFunctions.set(funcHash, {
+          ...currentFunctionSetup,
+          model: model.modelName,
+        });
       }
     }
 
-    const choice = await this.synthesiseAnswer(
-      prompt,
-      model,
-      llmParameters
-    );
+    const choice = await this.synthesiseAnswer(prompt, model, llmParameters);
 
     return new LanguageModelOutput(
       choice.trim(),
@@ -185,14 +196,11 @@ export class LanguageModelManager {
     model: BaseModelConfig,
     llmParameters: Record<string, any>
   ): Promise<string> {
-      const systemMessage = model.systemMessage;
-      // @ts-ignore
-    return await (await this.apiProviders.getProvider(model.provider)).generate(
-        model,
-        systemMessage,
-        prompt,
-        llmParameters
-      );
+    const systemMessage = model.systemMessage;
+    // @ts-ignore
+    return await (
+      (await this.apiProviders.getProvider(model.provider)) as Inferable
+    ).generate(model, systemMessage, prompt, llmParameters);
   }
 
   private getTeacherModelType(model: string): string {
@@ -220,18 +228,17 @@ export class LanguageModelManager {
       await this.functionModeler.getModels(functionDescription);
     const isDistilledModel = distilledModel.modelName !== '';
     const [suitableForDistillation, inputPromptTokenCount] =
-      this.suitableForFinetuningTokenCheck(
-        args,
-        f,
-        distilledModel
-      );
+      this.suitableForFinetuningTokenCheck(args, f, distilledModel);
     if (!this.initializedFunctions.has(funcHash)) {
       this.initializedFunctions.set(funcHash, { examples: [], model: '' });
     }
     if (isDistilledModel && suitableForDistillation) {
       const prompt = this.constructPrompt(f, args, [], distilledModel);
       if (!this.initializedFunctions.has(funcHash)) {
-        this.initializedFunctions.set(funcHash, { examples: [], model: 'finetuned_model_placeholder' });
+        this.initializedFunctions.set(funcHash, {
+          examples: [],
+          model: 'finetuned_model_placeholder',
+        });
       }
       return {
         prompt,
@@ -245,30 +252,49 @@ export class LanguageModelManager {
           functionDescription.hash(),
           16
         );
-      const examples = aligns
-        .map(
-          align =>
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/restrict-template-expressions
-            `Inputs:\nArgs: ${align.args.toString()}\nOutput: ${align.output ? align.output.toString() : 'null'}`
-        )
-      this.initializedFunctions.set(funcHash, { examples: examples, model: '' });
-      const examplesTokenCount = examples.map(example => approximateTokenCount(example)).reduce((sum, current) => sum + current, 0);
-      const generationTokens = llmParameters.max_new_tokens ?? this.defaultGenerationLength;
-      const totalTokenCount =
-        examplesTokenCount +
-        inputPromptTokenCount +
-        generationTokens;
+      const examples = aligns.map(
+        align =>
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/restrict-template-expressions
+          `Inputs:\nArgs: ${align.args.toString()}\nOutput: ${
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
+            align.output ? align.output.toString() : 'null'
+          }`
+      );
+      this.initializedFunctions.set(funcHash, {
+        examples: examples,
+        model: '',
+      });
+      const examplesTokenCount = examples
+        .map(example => approximateTokenCount(example))
+        .reduce((sum, current) => sum + current, 0);
+      const generationTokens =
+        llmParameters.max_new_tokens ?? this.defaultGenerationLength;
+      const totalTokenCount: number =
+        examplesTokenCount + inputPromptTokenCount + generationTokens;
 
-      const model = this.chooseModelFromTokens(teacherModels, totalTokenCount, examples.length);
+      const model = this.chooseModelFromTokens(
+        teacherModels,
+        totalTokenCount,
+        examples.length
+      );
 
       if (model) {
-        const examplesWithParsingTokens = aligns
-          .map(
-            align =>
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/restrict-template-expressions
-              `Inputs:\nArgs: ${align.args.toString()}\nOutput: ${model.parsingHelperTokens.startToken}${align.output ? align.output.toString() : 'null'}${model.parsingHelperTokens.endToken}`
-          )
-        const prompt = this.constructPrompt(f, args, examplesWithParsingTokens, model);
+        const examplesWithParsingTokens = aligns.map(
+          align =>
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/restrict-template-expressions
+            `Inputs:\nArgs: ${align.args.toString()}\nOutput: ${
+              model.parsingHelperTokens.startToken
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
+            }${align.output ? align.output.toString() : 'null'}${
+              model.parsingHelperTokens.endToken
+            }`
+        );
+        const prompt = this.constructPrompt(
+          f,
+          args,
+          examplesWithParsingTokens,
+          model
+        );
 
         return {
           prompt,
@@ -294,10 +320,14 @@ export class LanguageModelManager {
     )}\nOutput:`;
     const inputPromptTokenCount = approximateTokenCount(finetuningPrompt);
     if (distilledModel.systemMessageTokenCount < 0) {
-      distilledModel.systemMessageTokenCount = approximateTokenCount(distilledModel.systemMessage);
+      distilledModel.systemMessageTokenCount = approximateTokenCount(
+        distilledModel.systemMessage
+      );
     }
     if (distilledModel.instructionTokenCount < 0) {
-      distilledModel.instructionTokenCount = approximateTokenCount(distilledModel.instructions);
+      distilledModel.instructionTokenCount = approximateTokenCount(
+        distilledModel.instructions
+      );
     }
     const suitableForFinetune =
       inputPromptTokenCount +
@@ -329,9 +359,9 @@ export class LanguageModelManager {
 
     const instructionPrompt = model.instructions;
     const argsString = JSON.stringify(args);
-    const inputToken = model.parsingHelperTokens ? model.parsingHelperTokens.startToken : '';
-    const content = `${instructionPrompt}\nFunction: ${f}\n${exampleInput}---\nInputs:\nArgs: ${argsString}\nOutput:${inputToken}`;
-    return content
+    //const inputToken = model.parsingHelperTokens ? model.parsingHelperTokens.startToken : '';
+    const content = `${instructionPrompt}\nFunction: ${f}\n${exampleInput}---\nInputs:\nArgs: ${argsString}\nOutput:`;
+    return content;
   }
 
   /**
@@ -346,18 +376,39 @@ export class LanguageModelManager {
     models: BaseModelConfig[],
     generationParameters: Record<string, any> = {}
   ): Promise<string | null> {
-    const examples = aligns
+    const examples = aligns.map(
+      align =>
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/restrict-template-expressions
+        `Inputs:\nArgs: ${align.args.toString()}\nOutput: ${
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
+          align.output ? align.output.toString() : 'null'
+        }`
+    );
+    const examplesTokenCount: number = examples
+      .map(example => approximateTokenCount(example))
+      .reduce((sum, current) => sum + current, 0);
+    const failedExamplesTokenCount = failedOutputsList
       .map(
-        align =>
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/restrict-template-expressions
-          `Inputs:\nArgs: ${align.args.toString()}\nOutput: ${align.output ? align.output.toString() : 'null'}`
+        failedExample =>
+          approximateTokenCount(failedExample[0]) +
+          approximateTokenCount(failedExample[1])
       )
-    const examplesTokenCount = examples.map(example => approximateTokenCount(example)).reduce((sum, current) => sum + current, 0);
-    const failedExamplesTokenCount = failedOutputsList.map(failedExample => approximateTokenCount(failedExample[0]) + approximateTokenCount(failedExample[1])).reduce((sum, current) => sum + current, 0);
-    const inputPromptTokenCount = approximateTokenCount(`"Function: ${f}\n---\nInputs:\nArgs: ${args}\nOutput:"`);
-    const generationTokens = generationParameters['max_new_tokens'] ?? this.defaultGenerationLength;
+      .reduce((sum, current) => sum + current, 0);
+    const inputPromptTokenCount = approximateTokenCount(
+      `"Function: ${f}\n---\nInputs:\nArgs: ${args.toString()}\nOutput:"`
+    );
+    const generationTokens =
+      generationParameters['max_new_tokens'] ?? this.defaultGenerationLength;
 
-    const model = this.chooseModelFromTokens(models, examplesTokenCount+failedExamplesTokenCount+inputPromptTokenCount+generationTokens, examples.length);
+    const model = this.chooseModelFromTokens(
+      models,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      examplesTokenCount +
+        failedExamplesTokenCount +
+        inputPromptTokenCount +
+        generationTokens,
+      examples.length
+    );
     if (model) {
       const prompt = this.generateRepairPrompt(
         args,
@@ -366,9 +417,15 @@ export class LanguageModelManager {
         examples,
         model
       );
-      console.info(`Previous output failed type validation, attempting to repair with ${model.modelName}`)
-      const output = await this.synthesiseAnswer(prompt, model, generationParameters);
-      return output
+      console.info(
+        `Previous output failed type validation, attempting to repair with ${model.modelName}`
+      );
+      const output = await this.synthesiseAnswer(
+        prompt,
+        model,
+        generationParameters
+      );
+      return output;
     } else {
       return null;
     }
@@ -380,21 +437,32 @@ export class LanguageModelManager {
     examples: string[],
     model: BaseModelConfig
   ): string {
-    let successfulExamples = ""
+    let successfulExamples = '';
     if (examples.length > 0) {
-      const finalExamples = examples.map(align => `${model.parsingHelperTokens.startToken}${align}${model.parsingHelperTokens.endToken}` ).join('\n');
+      const finalExamples = examples
+        .map(
+          align =>
+            `${model.parsingHelperTokens.startToken}${align}${model.parsingHelperTokens.endToken}`
+        )
+        .join('\n');
       successfulExamples = `Examples:${finalExamples}\n`;
     }
     let failedExamples = '';
     for (const failedOutput of failedOutputsList) {
       failedExamples += `Output: ${failedOutput[0]}\nError: ${failedOutput[1]}\n\n`;
     }
-    let endTokenAddition = ""
+    let endTokenAddition = '';
     if (model.parsingHelperTokens.endToken) {
-      endTokenAddition = `Make sure to add the ${model.parsingHelperTokens.endToken} token at the end of the output.`
+      endTokenAddition = `Make sure to add the ${model.parsingHelperTokens.endToken} token at the end of the output.`;
     }
-    const prompt = `${model.repairInstruction}${endTokenAddition}\nFUNCTION DESCRIPTION: ${f}\n${successfulExamples}---${model.parsingHelperTokens.startToken}\nInputs:\nArgs: ${JSON.stringify(args)}\nFAILED EXAMPLES: ${failedExamples}Correct output:`;
-    return prompt
+    const prompt = `${
+      model.repairInstruction
+    }${endTokenAddition}\nFUNCTION DESCRIPTION: ${f}\n${successfulExamples}---${
+      model.parsingHelperTokens.startToken
+    }\nInputs:\nArgs: ${JSON.stringify(
+      args
+    )}\nFAILED EXAMPLES: ${failedExamples}Correct output:`;
+    return prompt;
   }
 
   /**
@@ -404,10 +472,16 @@ export class LanguageModelManager {
    * @param nrOfExamples - The number of examples
    * @private
    */
-  chooseModelFromTokens(models: BaseModelConfig[], inputTokenCount: number, nrOfExamples = 0): BaseModelConfig | null {
+  chooseModelFromTokens(
+    models: BaseModelConfig[],
+    inputTokenCount: number,
+    nrOfExamples = 0
+  ): BaseModelConfig | null {
     for (const model of models) {
       if (model.systemMessageTokenCount < 0) {
-        model.systemMessageTokenCount = approximateTokenCount(model.systemMessage);
+        model.systemMessageTokenCount = approximateTokenCount(
+          model.systemMessage
+        );
       }
       if (model.instructionTokenCount < 0) {
         model.instructionTokenCount = approximateTokenCount(model.instructions);
@@ -419,7 +493,10 @@ export class LanguageModelManager {
         inputTokenCount += 2 * nrOfExamples;
       }
 
-      const totalTokenCount = inputTokenCount + model.instructionTokenCount + model.systemMessageTokenCount;
+      const totalTokenCount =
+        inputTokenCount +
+        model.instructionTokenCount +
+        model.systemMessageTokenCount;
       if (totalTokenCount < model.contextLength) {
         return model;
       }
@@ -437,7 +514,7 @@ export class LanguageModelManager {
    * @param generationParameters - The parameters used for generation (i.e temp)
    */
   public async repairOutput(
-    args: any,
+    args: any[],
     functionDescription: FunctionDescription,
     choice: string,
     validator: Validator,
@@ -448,9 +525,7 @@ export class LanguageModelManager {
     )[1];
 
     if (teacherModels.length === 0) {
-      throw new Error(
-        'No teacher models available for this function.'
-      );
+      throw new Error('No teacher models available for this function.');
     }
     let valid = false;
     let retryIndex = 5;
@@ -495,7 +570,9 @@ export class LanguageModelManager {
         <JSONSchema>functionDescription.outputTypeSchema
       );
       if (!valid) {
-        const error = `Output type was not valid. Expected an object of type ${<string>functionDescription.outputTypeDefinition}, got '${choice}'`;
+        const error = `Output type was not valid. Expected an object of type ${<
+          string
+        >functionDescription.outputTypeDefinition}, got '${choice}'`;
         failedOutputsList.push([choice, error]);
         retryIndex--;
       }

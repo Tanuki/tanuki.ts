@@ -26,11 +26,11 @@ describe('Configurability Tests', () => {
         expect(Functions.tripleNumber(2)).toEqual(6);
       })
     })
-
-    const doubleNumberDescription = Register.loadFunctionDescription('doubleNumber', 'Double the input number');
+    Register.loadFunctions()
+    const doubleNumberDescription = Register.getNamedFunctions(Functions, 'Double the input number');
     const doubleNumberHash = doubleNumberDescription.hash();
 
-    const tripleNumberDescription = Register.loadFunctionDescription('tripleNumber', 'Triple the input number');
+    const tripleNumberDescription = Register.getNamedFunctions(Functions, 'Triple the input number');
     const tripleNumberHash = tripleNumberDescription.hash();
 
     expect(functionModeler.environmentId).toEqual(12);

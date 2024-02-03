@@ -7,7 +7,7 @@ class FunctionDescription {
   docstring: string;
   parentName?: string;
   sourceFile?: string;
-  inputTypeDefinition?: string
+  inputTypeDefinition?: string;
   inputTypeSchema?: JSONSchema;
   outputTypeDefinition?: string;
   outputTypeSchema?: JSONSchema;
@@ -54,7 +54,10 @@ class FunctionDescription {
     if (purpose === 'general') {
       return crypto.createHash('md5').update(jsonEncoded).digest('hex');
     } else if (purpose === 'finetune') {
-      return crypto.createHash('shake256', { outputLength: 8 }).update(jsonEncoded).digest('hex');
+      return crypto
+        .createHash('shake256', { outputLength: 8 })
+        .update(jsonEncoded)
+        .digest('hex');
     }
     throw new Error('Invalid hashing purpose');
   }

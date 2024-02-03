@@ -1,22 +1,23 @@
 {
   "name": "tanuki.ts",
-  "version": "0.0.1-development",
+  "version": "0.1.4-rc-1",
   "description": "TypeScript client for building LLM-powered applications",
   "main": "./lib/index.js",
   "type": "module",
   "files": [
-    "lib/**/*"
+    "lib/src/*"
   ],
   "scripts": {
     "build": "tspc --project tsconfig.build.json",
     "start": "node --experimental-vm-modules ./lib/index.js",
     "clean": "rm -rf ./lib/",
     "cm": "cz",
-    "lint": "eslint ./src/ --fix",
+    "lint": "eslint \"src/**/*.ts\" \"src/*.ts\" --fix",
     "prepare": "husky install",
     "semantic-release": "semantic-release",
-    "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watch",
-    "test": "node --experimental-vm-modules node_modules/.bin/jest --coverage",
+    "test:watch": "node node_modules/.bin/jest --config jest.config.mjs --watch",
+    "test": "node node_modules/.bin/jest --config jest.config.mjs --coverage",
+    "converage": "npx jest --coverage",
     "typecheck": "tspc --noEmit"
   },
   "repository": {
@@ -27,10 +28,10 @@
   "author": {
     "name": "Jack Hopkins",
     "email": "jackhopkins@users.noreply.github.com",
-    "url": "https://github.com/ryansonshine"
+    "url": "https://github.com/JackHopkins"
   },
   "engines": {
-    "node": ">=12.0"
+    "node": ">=13.0"
   },
   "keywords": [
     "boilerplate",
@@ -43,10 +44,13 @@
     "semantic-release",
     "codecov"
   ],
-  "bugs": {
-    "url": "https://github.com/ryansonshine/typescript-npm-package-template/issues"
+  "bin": {
+    "tanuki-type-compiler": "./preprocess.mjs"
   },
-  "homepage": "https://github.com/ryansonshine/typescript-npm-package-template#readme",
+  "bugs": {
+    "url": "https://github.com/Tanuki/tanuki.ts/issues"
+  },
+  "homepage": "https://github.com/Tanuki/tanuki.ts/#readme",
   "devDependencies": {
     "@babel/core": "^7.23.7",
     "@babel/preset-env": "^7.23.8",
@@ -56,24 +60,24 @@
     "@types/jest": "^29.1.0",
     "@types/node": "^12.20.11",
     "@types/uuid": "^9.0.7",
-    "@typescript-eslint/eslint-plugin": "^4.22.0",
-    "@typescript-eslint/parser": "^4.22.0",
-    "babel-jest": "^29",
+    "@typescript-eslint/eslint-plugin": "^6.20.0",
+    "@typescript-eslint/parser": "^6.20.0",
+    "babel-jest": "^29.7.0",
     "conventional-changelog-conventionalcommits": "^5.0.0",
-    "eslint": "^7.25.0",
+    "eslint": "^8.56.0",
     "eslint-config-prettier": "^8.3.0",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-prettier": "^3.4.0",
+    "esm": "^3.2.25",
     "husky": "^6.0.0",
-    "jest": "^29.1.0",
+    "jest": "^29.7.0",
     "lint-staged": "^13.2.1",
     "prettier": "^2.2.1",
     "semantic-release": "^21.0.1",
-    "ts-jest": "^29.1.0",
+    "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
     "ts-patch": "^3.1.2",
-    "typescript": "^5.3.3",
-    "esm": "^3.2.25"
+    "typescript": "^5.3.3"
   },
   "config": {
     "commitizen": {
