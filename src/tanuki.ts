@@ -117,19 +117,21 @@ export class Tanuki {
         expected,
         equal,
       }: {
-        actual: { functionDescription: FunctionDescription; input: any[] };
-        expected: { functionDescription: FunctionDescription; input: any[] };
+        actual: { functionDescription: FunctionDescription; input: any[] }
+        expected: { functionDescription: FunctionDescription; input: any[] }
         equal: boolean;
       }) {
         const functionDescription =
           actual.functionDescription as unknown as FunctionDescription;
         const input = actual.input;
         if (functionDescription.type === FunctionType.SYMBOLIC) {
+          const funcHash = functionDescription.hash();
           functionModeler.saveSymbolicAlignStatements(
-            functionDescription.hash(),
+            funcHash,
             input,
             expected
           );
+
         } else {
           if (isMockResponseType(expected)) {
             //expected
@@ -153,7 +155,7 @@ export class Tanuki {
       }
       const expect: ExpectFunctionType = actual => {
         const baseExpectation = async (
-          expected: any, //{ functionDescription: FunctionDescription; input: any[] },
+          expected: { functionDescription: FunctionDescription; input: any[] },
           equal: boolean
         ) => {
           const awaitedActual: {
@@ -162,7 +164,16 @@ export class Tanuki {
           } = await actual;
           if (
             awaitedActual.functionDescription.type !== FunctionType.SYMBOLIC &&
-            awaitedActual.functionDescription !== expected.functionDescription
+            awaitedActual.functionDescription.type !== FunctionType.EMBEDDABLE
+          ) {
+            throw new Error(
+              'Expected function type to be either symbolic or embeddable'
+            );
+          }
+          if (
+            awaitedActual.functionDescription.type !== FunctionType.SYMBOLIC &&
+              (awaitedActual.functionDescription.name !== expected.functionDescription.name
+              || awaitedActual.functionDescription.docstring !== expected.functionDescription.docstring)
           ) {
             throw new Error(
               'Expected embedding function descriptions to match, but they did not. Embeddable functions must be aligned with invocations of the same function in order to train the embedding space.'
@@ -177,18 +188,18 @@ export class Tanuki {
         };
 
         const baseObj = {
-          toMatchObject: (expected: any) => baseExpectation(expected, true),
-          toEqual: (expected: any) => baseExpectation(expected, true),
-          toBe: (expected: any) => baseExpectation(expected, true),
+          toMatchObject: (expected: { functionDescription: FunctionDescription; input: any[] }) => baseExpectation(expected, true),
+          toEqual: (expected: { functionDescription: FunctionDescription; input: any[] }) => baseExpectation(expected, true),
+          toBe: (expected: { functionDescription: FunctionDescription; input: any[] }) => baseExpectation(expected, true),
           toBeNull: () => baseExpectation(null, true),
         };
 
         return {
           ...baseObj,
           not: {
-            toMatchObject: (expected: any) => baseExpectation(expected, false),
-            toEqual: (expected: any) => baseExpectation(expected, false),
-            toBe: (expected: any) => baseExpectation(expected, false),
+            toMatchObject: (expected: { functionDescription: FunctionDescription; input: any[] }) => baseExpectation(expected, false),
+            toEqual: (expected: { functionDescription: FunctionDescription; input: any[] }) => baseExpectation(expected, false),
+            toBe: (expected: { functionDescription: FunctionDescription; input: any[] }) => baseExpectation(expected, false),
             toBeNull: () => baseExpectation(null, false),
           },
         };
@@ -245,7 +256,6 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
       let embeddingCase = false;
       if (config) {
         FunctionModeler.setConfig(functionDescription, config);
-        functionModeler.loadSymbolicAlignStatements(functionDescription.hash());
       }
 
       if (
@@ -254,6 +264,10 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
         /^Embedding<.*>$/.test(<string>functionDescription.outputTypeDefinition)
       ) {
         embeddingCase = true;
+      }
+
+      if (!embeddingCase) {
+        functionModeler.loadSymbolicAlignStatements(functionDescription.hash());
       }
 
       if (!config?.teacherModels) {
@@ -289,7 +303,7 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
         )) as unknown as OutputType;
       } else {
         const response = (await languageModeler.call(
-          input,
+          input as any[],
           functionDescription,
           validator,
           config.generationParams ?? {}

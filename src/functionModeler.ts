@@ -152,8 +152,8 @@ export class FunctionModeler {
     functionHash: string,
     args: any[],
     //kwargs: Record<string, any>,
-    positivePairs: Array<[any[], Record<string, any>]>,
-    negativePairs: Array<[any[], Record<string, any>]>
+    positivePairs: Array<any[]>,//, Record<string, any>]>,
+    negativePairs: Array<any[]>//, Record<string, any>]>
   ): void {
     // Prepare args and kwargs for saving
     const parsedArgs = this.prepareObjectForSaving(args);
@@ -188,10 +188,10 @@ export class FunctionModeler {
   private saveContrastiveAlignmentPair(
     functionHash: string,
     args: any[],
-    pair: [any[], Record<string, any>],
+    pair: Array<any[]>,//, Record<string, any>],
     positive: boolean
   ): void {
-    const example = new FunctionExample(args, pair);
+    const example = new FunctionExample(args, pair); // The args of the first, and the args of the second
     let successfullySaved = false;
     let newDatapoint = true;
 

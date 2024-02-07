@@ -86,13 +86,14 @@ export class Register {
       const pf = new FunctionDescription(
         pfj.name,
         pfj.docstring,
+        pfj.type ?? FunctionType.SYMBOLIC,
         pfj.parentName,
         pfj.sourceFile,
         undefined,
         undefined,
         pfj.inputTypeSchema,
         pfj.outputTypeSchema,
-        pfj.type ?? FunctionType.SYMBOLIC
+
       );
       if (pf.type === FunctionType.SYMBOLIC) {
         // Ensure the parentName key exists in the alignableSymbolicFunctions object
