@@ -5,9 +5,10 @@ import type * as ts from 'typescript';
 import { Expression, SourceFile } from 'typescript';
 import crypto from 'crypto';
 
+// The name of the file where the registered functions are stored
 // This unfortunately has to be defined twice - also in src/constants.ts.
-// This is because this code is run at compile time, before the constants are loaded.
-const REGISTERED_FUNCTIONS_FILENAME = 'functions.jsonl';
+// This is because this file is run at compile time, before the constants are loaded.
+export const REGISTERED_FUNCTIONS_FILENAME: string = 'functions.jsonl';
 
 enum FunctionType {
   SYMBOLIC = 'symbolic',
@@ -45,7 +46,7 @@ export interface JSONSchema {
   [key: string]: any;
 }
 
-class CompiledFunctionDescription {
+export class CompiledFunctionDescription {
   name: string;
   docstring: string;
   parentName?: string;
@@ -187,7 +188,7 @@ export class PatchFunctionCompiler {
   }
 
   tokenizeTypeScriptType(typeString: string): TokenStream {
-    const regex = /{|}|\|| (\w+):|[^{};:]+|;/g;
+    const regex = /{|}|\|| (\w+\??):|[^{};:]+|;/g;
     const tokens: TokenStream = [];
     let match;
 
@@ -211,74 +212,214 @@ export class PatchFunctionCompiler {
         : tokens[currentTokenIndex - 1];
     }
 
-    function parseObject(): JSONSchema {
-      const schema: JSONSchema = { type: 'object', properties: {} };
+    function parseTuple(): JSONSchema {
       let token = getNextToken();
+      let schema: JSONSchema = { type: 'array', items: [] };
+      schema = { type: 'array', items: [] };
+      while (token && token !== ']') {
+        let optional = false;
+        if (token.endsWith('?')) {
+          optional = true;
+          token = token.slice(0, -1); // Remove the '?' to process the type
+        }
+        let itemType: JSONSchema;
+        if (token == '{') {
+          itemType = parseObject();
+        } else if (token == '[') {
+          itemType = parseTuple();
+        } else {
+          itemType = parseType(token);
+        }
+        //const itemType = parseType(token);
 
-      while (token !== '}' && currentTokenIndex < tokens.length) {
-        if (/\w+:/.exec(token)) {
-          const propertyName = token.replace(':', '').trim();
-          schema.properties![propertyName] = parseType();
+        if (optional) {
+          // In JSON Schema for tuples, to make an item optional,
+          // you use `oneOf` with the type and null
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+          schema?.items?.push({
+            oneOf: [itemType, { type: 'null' }],
+          });
+        } else {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+          schema.items?.push(itemType);
+        }
+
+        token = getNextToken();
+      }
+
+      return schema;
+    }
+    function parseObject(): JSONSchema {
+      let token = getNextToken();
+      const schema: JSONSchema = { type: 'object', properties: {} };
+      while (
+        token !== '}' &&
+        token != '}?' &&
+        currentTokenIndex < tokens.length
+      ) {
+        let optional = false;
+        if (/\w+\??:/.exec(token)) {
+          // Check if property is optional
+          optional = token.includes('?');
+          const propertyName = token.replace('?', '').replace(':', '').trim();
+          //schema.properties![propertyName] = parseType();
+          let propertyType;
+          if (peekNextToken() == '{') {
+            propertyType = parseObject();
+          } else if (peekNextToken() == '[') {
+            propertyType = parseTuple();
+          } else {
+            propertyType = parseType();
+          }
+          //const propertyType = parseType();
+          // Update property schema with optional flag
+          if (optional) {
+            // If the property is optional, indicate it using JSON Schema's "required"
+            schema.properties![propertyName] = {
+              ...propertyType,
+              ...{ nullable: true },
+            };
+          } else {
+            schema.properties![propertyName] = propertyType;
+
+            // If the property is required, add it to the "required" array
+            schema.required = schema.required || [];
+            schema.required.push(propertyName);
+          }
         }
         token = getNextToken();
       }
 
-      if (/("([^"]+)"\s*\|\s*)+"([^"]+)"/.exec(token)) {
+      if (
+        /(("([^"]+)"|\d|false|true)\s*\|\s*)+("([^"]+)"|\d|true|false)/.exec(
+          token
+        )
+      ) {
         return parseType();
       }
 
-      // Check for array types (e.g., 'string[]')
-      if (token.endsWith('[]')) {
-        const itemType = token.substring(0, token.length - 2).trim();
-        return {
-          type: 'array',
-          items: { type: itemType },
-        };
-      }
       // Handle primitive types (number, string, boolean)
       const primitiveTypes = ['number', 'string', 'boolean', 'null'];
-      if (primitiveTypes.includes(token)) {
-        return { type: token };
-      } else {
-        return schema;
+      const tokenSansOptional = token.endsWith('?')
+        ? token.slice(0, -1)
+        : token;
+      if (primitiveTypes.includes(tokenSansOptional)) {
+        return parseType();
+      } else if (tokenSansOptional.endsWith('[]')) {
+        return parseType();
       }
+
+      // Handle optional object types
+      if (token?.endsWith('?')) {
+        return {
+          oneOf: [schema, { type: 'null' }],
+        };
+      }
+
+      // If a single type, parse it and return it
+      if (tokens.length == 1) {
+        return parseType(token);
+      }
+
+      return schema;
     }
 
-    function parseType(): JSONSchema {
-      let token = peekNextToken();
-      if (!peekNextToken()) {
-        token = getNextToken();
+    function parseUnionType(types: string[]): JSONSchema {
+      // Initial split and cleanup if types is a single string; adjust as needed based on actual input
+      if (types.length === 1 && types[0].includes('|')) {
+        types = types[0].split('|').map(type => type.trim());
       }
 
-      if (token === '{') {
+      const numericLiterals: number[] = [];
+      const booleanLiterals: boolean[] = [];
+      const stringLiterals: string[] = [];
+      const includesNull =
+        types.includes('null') || types.includes('undefined');
+      const otherTypes: string[] = [];
+
+      // Separate types into their respective arrays
+      types.forEach(type => {
+        if (/^\d+$/.test(type)) {
+          // Numeric literal
+          numericLiterals.push(Number(type));
+        } else if (type === 'true' || type === 'false') {
+          // Boolean literal
+          booleanLiterals.push(type === 'true');
+        } else if (/^"([^"]+)"$/.test(type)) {
+          // String literal, including quoted booleans
+          stringLiterals.push(type.slice(1, -1));
+        } else {
+          otherTypes.push(type);
+        }
+      });
+
+      const oneOf = [];
+
+      // Aggregate and push the collected types into the oneOf array appropriately
+      if (includesNull) {
+        oneOf.push({ type: 'null' });
+      }
+      if (numericLiterals.length) {
+        oneOf.push({ type: 'number', enum: numericLiterals });
+      }
+      if (booleanLiterals.length === 2) {
+        // If both true and false are present
+        oneOf.push({ type: 'boolean' });
+      } else if (booleanLiterals.length) {
+        // For boolean literals, you might need special handling
+        booleanLiterals.forEach(literal => {
+          oneOf.push({ type: 'boolean', enum: [literal] });
+        });
+      }
+      if (stringLiterals.length) {
+        oneOf.push({ type: 'string', enum: stringLiterals });
+      }
+      if (otherTypes.length) {
+        otherTypes.forEach(type => {
+          if (type !== 'null' && type !== 'undefined') {
+            oneOf.push({ type });
+          }
+        });
+      }
+
+      // Return directly if oneOf has only one element, to simplify the schema
+      if (oneOf.length === 1) {
+        return oneOf[0];
+      }
+
+      return { oneOf };
+    }
+    function parse() {
+      const token = peekNextToken();
+      if (token == '{') {
+        getNextToken();
         return parseObject();
-      } else if (token.includes('|')) {
-        const types = token.split('|').map(s => s.trim().replace(/"/g, ''));
-        // Check if one of the union types is 'Date'
-        if (types.includes('Date')) {
-          return types.length === 1
-            ? { type: 'string', format: 'date-time' }
-            : {
-                oneOf: types.map(t =>
-                  t === 'Date'
-                    ? { type: 'string', format: 'date-time' }
-                    : { type: t }
-                ),
-              };
+      }
+      if (token == '[') {
+        getNextToken();
+        return parseTuple();
+      }
+      return parseType();
+    }
+    function parseType(withToken?: string): JSONSchema {
+      let token = withToken;
+      if (token === undefined) {
+        token = peekNextToken();
+        if (!peekNextToken()) {
+          token = getNextToken();
         }
-        if (types.includes('null')) {
-          types.splice(types.indexOf('null'), 1);
-          return {
-            oneOf: [{ type: 'null' }, { type: 'string', enum: types }],
-          };
-        }
-        return {
-          type: 'string',
-          enum: types,
-        };
+      }
+
+      if (token.includes('|')) {
+        const types = token.split('|').map(t => t.trim());
+        return parseUnionType(types);
       } else if (token.includes('&')) {
         const types = token.split('&').map(s => s.trim().replace(/"/g, ''));
         return { allOf: types.map(t => ({ type: t })) };
+      } else if (token.endsWith('?')) {
+        return {
+          oneOf: [parseType(token.slice(0, -1)), { type: 'null' }],
+        };
       } else if (token.trim() === 'any') {
         return {};
       } else if (token.trim().startsWith('Record')) {
@@ -288,12 +429,18 @@ export class PatchFunctionCompiler {
         };
       } else if (token.trim() === 'Date') {
         return { type: 'string', format: 'date-time' };
+      } else if (token.endsWith('[]')) {
+        const itemType = token.substring(0, token.length - 2).trim();
+        return {
+          type: 'array',
+          items: { type: itemType },
+        };
       } else {
         return { type: token.trim() };
       }
     }
 
-    const schema = parseObject();
+    const schema = parse();
     schema.$id = name;
     schema.$schema = 'http://json-schema.org/draft-07/schema#';
 
@@ -382,7 +529,7 @@ export class PatchFunctionCompiler {
     file: ts.SourceFile,
     currentClassOrModule: ts.ClassDeclaration | ts.ModuleDeclaration | null
   ): CompiledFunctionDescription | null {
-    console.trace(currentClassOrModule);
+    //console.trace(currentClassOrModule);
     if (
       this.ts.isPropertyDeclaration(node) &&
       node.initializer &&
@@ -394,7 +541,7 @@ export class PatchFunctionCompiler {
         node.parent.name &&
         this.ts.isClassDeclaration(node.parent)
       ) {
-        if (node.parent.name.getText() === 'Function') {
+        if (node.parent.name.getText(file) === 'Function') {
           throw new Error(
             'The class `Function` cannot have patched functions as members, as this is a reserved word. You could rename the class.'
           );
@@ -408,7 +555,7 @@ export class PatchFunctionCompiler {
 
       const name = functionName; // Use the passed function name
 
-      const docstringWithTicks = node.initializer.template.getText();
+      const docstringWithTicks = node.initializer.template.getText(file)
       const docstring = docstringWithTicks.replace(/`/g, '');
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       const typeArguments: any[] = (node.initializer.tag as any).typeArguments;
@@ -421,7 +568,7 @@ export class PatchFunctionCompiler {
         const inputType = inputTypeNode.getText(file); // Get the textual representation of the input type
         const outputType = outputTypeNode.getText(file); // Get the textual representation of the output type
 
-        const current = this.currentClassOrModule;
+        const current = this.currentClassOrModule || currentClassOrModule;
         const inputTypeDefinition = this.extractTypeDefinition(
           inputType,
           current,
@@ -438,7 +585,7 @@ export class PatchFunctionCompiler {
           : FunctionType.EMBEDDABLE;
         //name = current?.name?.getText() + "." + name
         // @ts-ignore
-        const parentName = current.name.getText();
+        const parentName = current.name.getText(file);
         return new CompiledFunctionDescription(
           name,
           docstring,
@@ -451,12 +598,14 @@ export class PatchFunctionCompiler {
           type
         );
       } else {
-        console.log('Type arguments not found or not in expected format');
+        //console.log('Type arguments not found or not in expected format');
+        throw new Error('Type arguments not found or not in expected format');
       }
     } else {
-      console.log(
-        'Node is not a property declaration with a tagged template expression'
-      );
+      //console.log(
+      //  'Node is not a property declaration with a tagged template expression'
+      //);
+      throw new Error('Node is not a property declaration with a tagged template expression')
     }
 
     return null;
@@ -483,7 +632,7 @@ export class PatchFunctionCompiler {
     }*/
     // Next, try to resolve the type in the current scope
     let definition = currentScope
-      ? this.findAndResolveTypeInScope(type, currentScope)
+      ? this.findAndResolveTypeInScope(type, currentScope, file)
       : undefined;
     if (definition) {
       return definition;
@@ -512,7 +661,8 @@ export class PatchFunctionCompiler {
    */
   findAndResolveTypeInScope(
     inputType: string,
-    scopeNode: ts.Node
+    scopeNode: ts.Node,
+    sourceFile: ts.SourceFile
   ): undefined | string {
     const typeAliases = new Map<string, ts.TypeNode>();
     const interfaces = new Map<string, ts.InterfaceDeclaration>();
@@ -539,14 +689,23 @@ export class PatchFunctionCompiler {
           node.type,
           typeAliases,
           interfaces,
-          enums
+          enums,
+          new Map<string, string>(),
+          sourceFile
         );
       } else if (
         this.ts.isInterfaceDeclaration(node) &&
         inputType === node.name.text
       ) {
         const members = node.members.map(member =>
-          this.resolveTypeMember(member, typeAliases, interfaces, enums)
+          this.resolveTypeMember(
+            member,
+            typeAliases,
+            interfaces,
+            enums,
+            new Map<string, string>(),
+            sourceFile
+          )
         );
         resolvedType = this.renderInterface(members);
       } else if (
@@ -554,7 +713,14 @@ export class PatchFunctionCompiler {
         inputType === node.name.text
       ) {
         const members = node.members.map(member =>
-          this.resolveType(member, typeAliases, interfaces, enums)
+          this.resolveType(
+            member,
+            typeAliases,
+            interfaces,
+            enums,
+            new Map<string, string>(),
+            sourceFile
+          )
         );
         resolvedType = this.renderEnum(members);
       } else if (
@@ -570,6 +736,34 @@ export class PatchFunctionCompiler {
     });
 
     return resolvedType;
+  }
+
+  convertClassDeclarationToInterface(
+    node: ts.ClassDeclaration
+  ): ts.InterfaceDeclaration {
+    const members = node.members
+      .map(member => {
+        if (this.ts.isPropertyDeclaration(member) && member.type) {
+          return this.ts.factory.createPropertySignature(
+            [],
+            member.name,
+            member.questionToken,
+            member.type
+          );
+        }
+        // Add more member conversions as necessary
+        return undefined;
+      })
+      .filter((member): member is ts.PropertySignature => member !== undefined);
+
+    const interfaceDeclaration = this.ts.factory.createInterfaceDeclaration(
+      [this.ts.factory.createModifier(this.ts.SyntaxKind.ExportKeyword)],
+      `I${node.name?.text}`,
+      undefined,
+      undefined,
+      members
+    );
+    return interfaceDeclaration;
   }
 
   /**
@@ -589,7 +783,13 @@ export class PatchFunctionCompiler {
 
     // Find all type aliases and interfaces
     sourceFile.forEachChild(node => {
-      if (this.ts.isTypeAliasDeclaration(node)) {
+      // We don't support classes as Tanuki functions are data-only, so we convert them to interfaces
+      if (this.ts.isClassDeclaration(node) && node.name) {
+        interfaces.set(
+          node.name.text,
+          this.convertClassDeclarationToInterface(node)
+        );
+      } else if (this.ts.isTypeAliasDeclaration(node)) {
         typeAliases.set(node.name.text, node.type);
       } else if (this.ts.isInterfaceDeclaration(node)) {
         interfaces.set(node.name.text, node);
@@ -609,13 +809,27 @@ export class PatchFunctionCompiler {
         this.ts.isTypeAliasDeclaration(node) &&
         inputType === node.name.text
       ) {
-        return this.resolveType(node.type, typeAliases, interfaces, enums);
+        return this.resolveType(
+          node.type,
+          typeAliases,
+          interfaces,
+          enums,
+          new Map<string, string>(),
+          sourceFile
+        );
       } else if (
         this.ts.isInterfaceDeclaration(node) &&
         inputType === node.name.text
       ) {
         const members = node.members.map(member =>
-          this.resolveTypeMember(member, typeAliases, interfaces, enums)
+          this.resolveTypeMember(
+            member,
+            typeAliases,
+            interfaces,
+            enums,
+            new Map<string, string>(),
+            sourceFile
+          )
         );
         return this.renderInterface(members);
       } else if (
@@ -623,7 +837,14 @@ export class PatchFunctionCompiler {
         inputType === node.name.text
       ) {
         const members = node.members.map(member => {
-          return this.resolveType(member, typeAliases, interfaces, enums);
+          return this.resolveType(
+            member,
+            typeAliases,
+            interfaces,
+            enums,
+            new Map<string, string>(),
+            sourceFile
+          );
         });
         return this.renderEnum(members);
       } else if (
@@ -632,7 +853,13 @@ export class PatchFunctionCompiler {
         inputType === node.name.text
       ) {
         const members = node.members.map(member =>
-          this.resolveClassMember(member, typeAliases, interfaces, enums)
+          this.resolveClassMember(
+            member,
+            typeAliases,
+            interfaces,
+            enums,
+            new Map<string, string>()
+          )
         );
         return this.renderInterface(members);
       }
@@ -640,19 +867,68 @@ export class PatchFunctionCompiler {
   }
 
   resolveType(
-    node: ts.TypeNode | ts.EnumMember,
+    node: ts.TypeNode | ts.EnumMember | ts.InterfaceDeclaration,
     typeAliases: Map<string, ts.TypeNode>,
     interfaces: Map<string, ts.InterfaceDeclaration>,
     enums: Map<string, ts.EnumDeclaration>,
-    concreteTypes: Map<string, string> = new Map()
+    concreteTypes: Map<string, string> = new Map(),
+    sourceFile?: ts.SourceFile
   ): string {
     if (this.ts.isTypeReferenceNode(node)) {
-      const typeName = node.typeName.getText();
+      const typeName: string =
+        // @ts-ignore (escapedText is available on Identifier)
+        node.typeName.escapedText || node.typeName.getText();
+
+      if (typeName === 'Partial') {
+        const typeArgument = node.typeArguments && node.typeArguments[0];
+        if (!typeArgument) return '{}'; // If Partial has no type argument, return empty object type
+
+        // Resolve the type argument of Partial
+        const resolvedType = this.resolveType(
+          typeArgument,
+          typeAliases,
+          interfaces,
+          enums,
+          concreteTypes,
+          sourceFile
+        );
+
+        const optionalizedType = resolvedType.replace(
+          /([a-zA-Z0-9_]+):/g,
+          '$1?:'
+        );
+
+        return optionalizedType;
+      }
+      //@ts-ignore escapedText is available on Identifier
+      if (node.typeName && node.typeName.escapedText === 'Readonly') {
+        const typeArguments =
+          node.typeArguments && node.typeArguments[0]
+            ? node.typeArguments[0]
+            : node;
+
+        return this.resolveType(
+          typeArguments,
+          typeAliases,
+          interfaces,
+          enums,
+          concreteTypes,
+          sourceFile
+        );
+      }
+
       const typeDeclaration = typeAliases.get(typeName);
 
       if (node.typeArguments) {
         const resolvedTypeArgs = node.typeArguments.map(arg =>
-          this.resolveType(arg, typeAliases, interfaces, enums, concreteTypes)
+          this.resolveType(
+            arg,
+            typeAliases,
+            interfaces,
+            enums,
+            concreteTypes,
+            sourceFile
+          )
         );
 
         if (typeDeclaration) {
@@ -661,16 +937,26 @@ export class PatchFunctionCompiler {
             resolvedTypeArgs,
             typeAliases,
             interfaces,
-            enums
+            enums,
+            sourceFile
           );
-          // Add more checks for other types like classes if needed
+          // We may want to add more cases here
         }
       }
 
-      const alias = typeAliases.get(node.typeName.getText());
-      return alias
-        ? this.resolveType(alias, typeAliases, interfaces, enums, concreteTypes)
-        : node.typeName.getText();
+      const alias: ts.TypeNode | ts.InterfaceDeclaration | undefined =
+        typeAliases.get(typeName) || interfaces.get(typeName);
+      if (alias !== undefined) {
+        return this.resolveType(
+          alias,
+          typeAliases,
+          interfaces,
+          enums,
+          concreteTypes,
+          sourceFile
+        );
+      }
+      return typeName;
     } else if (
       this.ts.isTypeLiteralNode(node) ||
       this.ts.isInterfaceDeclaration(node)
@@ -684,7 +970,8 @@ export class PatchFunctionCompiler {
           typeAliases,
           interfaces,
           enums,
-          concreteTypes
+          concreteTypes,
+          sourceFile
         )
       );
       return this.renderLiterals(membersList);
@@ -693,11 +980,31 @@ export class PatchFunctionCompiler {
       this.ts.isIntersectionTypeNode(node)
     ) {
       const members = node.types.map(type =>
-        this.resolveType(type, typeAliases, interfaces, enums, concreteTypes)
+        this.resolveType(
+          type,
+          typeAliases,
+          interfaces,
+          enums,
+          concreteTypes,
+          sourceFile
+        )
       );
       return this.renderUnion(node, members);
     }
-    return node.getText();
+    return node.getText(sourceFile);
+  }
+
+  captureTypeParameters(
+    typeParameters: ts.NodeArray<ts.TypeParameterDeclaration>
+  ): Map<string, string> {
+    const typeParams = new Map<string, string>();
+    typeParameters.forEach(param => {
+      typeParams.set(
+        param.name.getText(),
+        param.constraint?.getText() || 'any'
+      );
+    });
+    return typeParams;
   }
 
   substituteTypeArguments(
@@ -709,18 +1016,37 @@ export class PatchFunctionCompiler {
     resolvedTypeArgs: string[],
     typeAliases: Map<string, ts.TypeNode>,
     interfaces: Map<string, ts.InterfaceDeclaration>,
-    enums: Map<string, ts.EnumDeclaration>
+    enums: Map<string, ts.EnumDeclaration>,
+    sourceFile?: ts.SourceFile
   ): string {
     if (this.ts.isTypeAliasDeclaration(typeDeclaration)) {
+      /*
+      // TODO: Implement generics
+      // Assume `typeParameters` captures generic type parameters with their constraints if any
+      const typeParameters = typeDeclaration.typeParameters
+        ? this.captureTypeParameters(typeDeclaration.typeParameters)
+        : undefined;
+      */
+
       // For TypeAliasDeclaration, use the 'type' property
       return this.resolveType(
         typeDeclaration.type,
         typeAliases,
         interfaces,
         enums,
-        new Map([['T', resolvedTypeArgs[0]]])
+        new Map([['T', resolvedTypeArgs[0]]]),
+        sourceFile
       );
     } else if (this.ts.isInterfaceDeclaration(typeDeclaration)) {
+      /*
+      // TODO: Implement generics
+
+      // Assume `typeParameters` captures generic type parameters with their constraints if any
+      const typeParameters = typeDeclaration.typeParameters
+        ? this.captureTypeParameters(typeDeclaration.typeParameters)
+        : undefined;
+      */
+
       // For InterfaceDeclaration, handle by iterating over its members
       const members = typeDeclaration.members.map(member =>
         this.resolveTypeMember(
@@ -728,17 +1054,12 @@ export class PatchFunctionCompiler {
           typeAliases,
           interfaces,
           enums,
-          new Map([['T', resolvedTypeArgs[0]]])
+          new Map([['T', resolvedTypeArgs[0]]]),
+          sourceFile
         )
       );
       return this.renderInterface(members);
     } else if (this.ts.isEnumDeclaration(typeDeclaration)) {
-      // For EnumDeclaration, handle by iterating over its members
-      /* const /*enumMembers = typeDeclaration.members
-         .map(member => member.name.getText())
-         .join(', ');
-       return `{ ${enumMembers} }`;*/
-
       const enumMembers = typeDeclaration.members.map(member => {
         // If the enum member has an initializer, use it to get the value
         if (member.initializer) {
@@ -765,7 +1086,8 @@ export class PatchFunctionCompiler {
         typeAliases,
         interfaces,
         enums,
-        new Map([['T', expandedType]])
+        new Map([['T', expandedType]]),
+        sourceFile
       );
       return resolvedType;
     }
@@ -798,18 +1120,20 @@ export class PatchFunctionCompiler {
   }
 
   resolveTypeMember(
-    member: ts.TypeElement,
+    member: ts.TypeElement | ts.Node,
     typeAliases: Map<string, ts.TypeNode>,
     interfaces: Map<string, ts.InterfaceDeclaration>,
     enums: Map<string, ts.EnumDeclaration>,
-    concreteTypes: Map<string, string> = new Map()
+    concreteTypes: Map<string, string> = new Map(),
+    sourceFile?: ts.SourceFile
   ): string {
     if (this.ts.isPropertySignature(member)) {
-      const propertyName = member.name.getText();
+      const property = member.name || member.modifiers;
+      // @ts-ignore (escapedText is available on Identifier)
+      const propertyName = property.escapedText || property.getText();
       let propertyType = 'any'; // Default type
-
       if (member.type) {
-        const memberTypeName = member.type.getText();
+        const memberTypeName = member.type.getText(sourceFile);
         // Check if the type is an enum and resolve it
         if (enums.has(memberTypeName)) {
           propertyType = this.resolveConcreteType(
@@ -824,7 +1148,8 @@ export class PatchFunctionCompiler {
             typeAliases,
             interfaces,
             enums,
-            concreteTypes
+            concreteTypes,
+            sourceFile
           );
 
           // Substitute generic type argument if applicable
@@ -834,8 +1159,17 @@ export class PatchFunctionCompiler {
           }
         }
       }
+      //let isOptional = false; // Default to required
+      //if (member.questionToken) {
+      //  isOptional = true;
+      //}
+      // Check if the property is optional based on the presence of an initializer
+      const isOptional = member.questionToken !== undefined;
 
-      return `${propertyName}: ${propertyType}`;
+      // Include optional flag in the output string if applicable
+      const optionalModifier = isOptional ? '?' : '';
+
+      return `${propertyName}${optionalModifier}: ${propertyType}`;
     }
 
     // TODO: Implement handling for other member types (methods, index signatures, etc.)
@@ -905,7 +1239,13 @@ export class PatchFunctionCompiler {
       if (this.ts.isInterfaceDeclaration(typeDeclaration)) {
         // Resolve an interface declaration
         const members = typeDeclaration.members.map(member =>
-          this.resolveTypeMember(member, typeAliases, interfaces, enums)
+          this.resolveTypeMember(
+            member,
+            typeAliases,
+            interfaces,
+            enums,
+            new Map<string, string>()
+          )
         );
 
         return this.renderInterface(members);
@@ -1062,10 +1402,20 @@ export class PatchFunctionCompiler {
   }
 
   private renderLiterals(members: string[]) {
+    // Filter out empty members (e.g if they are unsupported method signatures)
+    members = members.filter(member => member !== '');
+    if (members.length === 0) {
+      return '{}';
+    }
     return `{ ${members.join('; ')} }`;
   }
 
   private renderInterface(members: string[]) {
+    // Filter out empty members (e.g if they are unsupported method signatures)
+    members = members.filter(member => member !== '');
+    if (members.length === 0) {
+      return '{}';
+    }
     return `{ ${members.join('; ')} }`;
   }
 

@@ -117,8 +117,8 @@ export class Tanuki {
         expected,
         equal,
       }: {
-        actual: { functionDescription: FunctionDescription; input: any[] }
-        expected: { functionDescription: FunctionDescription; input: any[] }
+        actual: { functionDescription: FunctionDescription; input: any[] };
+        expected: { functionDescription: FunctionDescription; input: any[] };
         equal: boolean;
       }) {
         const functionDescription =
@@ -131,7 +131,6 @@ export class Tanuki {
             input,
             expected
           );
-
         } else {
           if (isMockResponseType(expected)) {
             //expected
@@ -172,8 +171,10 @@ export class Tanuki {
           }
           if (
             awaitedActual.functionDescription.type !== FunctionType.SYMBOLIC &&
-              (awaitedActual.functionDescription.name !== expected.functionDescription.name
-              || awaitedActual.functionDescription.docstring !== expected.functionDescription.docstring)
+            (awaitedActual.functionDescription.name !==
+              expected.functionDescription.name ||
+              awaitedActual.functionDescription.docstring !==
+                expected.functionDescription.docstring)
           ) {
             throw new Error(
               'Expected embedding function descriptions to match, but they did not. Embeddable functions must be aligned with invocations of the same function in order to train the embedding space.'
@@ -188,18 +189,36 @@ export class Tanuki {
         };
 
         const baseObj = {
-          toMatchObject: (expected: { functionDescription: FunctionDescription; input: any[] }) => baseExpectation(expected, true),
-          toEqual: (expected: { functionDescription: FunctionDescription; input: any[] }) => baseExpectation(expected, true),
-          toBe: (expected: { functionDescription: FunctionDescription; input: any[] }) => baseExpectation(expected, true),
+          toMatchObject: (expected: {
+            functionDescription: FunctionDescription;
+            input: any[];
+          }) => baseExpectation(expected, true),
+          toEqual: (expected: {
+            functionDescription: FunctionDescription;
+            input: any[];
+          }) => baseExpectation(expected, true),
+          toBe: (expected: {
+            functionDescription: FunctionDescription;
+            input: any[];
+          }) => baseExpectation(expected, true),
           toBeNull: () => baseExpectation(null, true),
         };
 
         return {
           ...baseObj,
           not: {
-            toMatchObject: (expected: { functionDescription: FunctionDescription; input: any[] }) => baseExpectation(expected, false),
-            toEqual: (expected: { functionDescription: FunctionDescription; input: any[] }) => baseExpectation(expected, false),
-            toBe: (expected: { functionDescription: FunctionDescription; input: any[] }) => baseExpectation(expected, false),
+            toMatchObject: (expected: {
+              functionDescription: FunctionDescription;
+              input: any[];
+            }) => baseExpectation(expected, false),
+            toEqual: (expected: {
+              functionDescription: FunctionDescription;
+              input: any[];
+            }) => baseExpectation(expected, false),
+            toBe: (expected: {
+              functionDescription: FunctionDescription;
+              input: any[];
+            }) => baseExpectation(expected, false),
             toBeNull: () => baseExpectation(null, false),
           },
         };

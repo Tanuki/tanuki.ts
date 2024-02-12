@@ -92,8 +92,7 @@ export class Register {
         undefined,
         undefined,
         pfj.inputTypeSchema,
-        pfj.outputTypeSchema,
-
+        pfj.outputTypeSchema
       );
       if (pf.type === FunctionType.SYMBOLIC) {
         // Ensure the parentName key exists in the alignableSymbolicFunctions object

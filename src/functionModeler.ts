@@ -25,6 +25,7 @@ interface FunctionExampleData {
   kwargs: Record<string, any>;
   output: any;
 }
+type Pair = [any[], Record<string, any>];
 
 export class FunctionModeler {
   public distillationTokenLimit: number;
@@ -152,8 +153,8 @@ export class FunctionModeler {
     functionHash: string,
     args: any[],
     //kwargs: Record<string, any>,
-    positivePairs: Array<any[]>,//, Record<string, any>]>,
-    negativePairs: Array<any[]>//, Record<string, any>]>
+    positivePairs: Array<Pair>, //, Record<string, any>]>,
+    negativePairs: Array<Pair> //, Record<string, any>]>
   ): void {
     // Prepare args and kwargs for saving
     const parsedArgs = this.prepareObjectForSaving(args);
@@ -188,7 +189,7 @@ export class FunctionModeler {
   private saveContrastiveAlignmentPair(
     functionHash: string,
     args: any[],
-    pair: Array<any[]>,//, Record<string, any>],
+    pair: Pair,
     positive: boolean
   ): void {
     const example = new FunctionExample(args, pair); // The args of the first, and the args of the second

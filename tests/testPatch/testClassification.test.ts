@@ -11,9 +11,9 @@ describe('Sentiment Analysis Tests', () => {
 
   // Assuming tanuki.align functionality is handled within the test itself
   it('align_classify_sentiment', async () => {
-    Tanuki.align(async (it) => {
+    await Tanuki.align(async (it) => {
       it("Specify how our functions should behave.", async (expect) => {
-        expect(await ClassifierSentiment.classifySentimentPair(["I love you", "I love woo"])).toEqual('Good');
+        await expect(await ClassifierSentiment.classifySentimentPair(["I love you", "I love woo"])).toEqual('Good');
         expect(await ClassifierSentiment.classifySentimentPair(["I hate you", "You're disgusting"])).toEqual('Bad');
         expect(await ClassifierSentiment.classifySentimentPair(["Today is wednesday", "The dogs are running outside"])).toBeNull();
 
