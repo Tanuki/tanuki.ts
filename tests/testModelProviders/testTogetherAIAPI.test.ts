@@ -37,13 +37,13 @@ describe('Sentiment Analysis Tests for OpenChat', () => {
         Tanuki.align(async (it) => {
             it("Specify how our functions should behave.", async (expect) => {
                 const iLoveYou = "I love you";
-                expect(await TogetherSentimentClassifier.classifySentiment2([iLoveYou, "I love woo"])).toEqual('Good');
-                expect(await TogetherSentimentClassifier.classifySentiment2(["I hate you", "You're disgusting"])).toEqual('Bad');
-                expect(await TogetherSentimentClassifier.classifySentiment2(["Today is Wednesday", "The dogs are running outside"])).toBeNull();
+                await expect(TogetherSentimentClassifier.classifySentiment2([iLoveYou, "I love woo"])).toEqual('Good');
+                await expect(TogetherSentimentClassifier.classifySentiment2(["I hate you", "You're disgusting"])).toEqual('Bad');
+                await expect(TogetherSentimentClassifier.classifySentiment2(["Today is Wednesday", "The dogs are running outside"])).toBeNull();
 
-                expect(await TogetherSentimentClassifier.classifySentiment("I love you")).toEqual('Good');
-                expect(await TogetherSentimentClassifier.classifySentiment("I hate you")).toEqual('Bad');
-                expect(await TogetherSentimentClassifier.classifySentiment("Wednesdays are in the middle of the week")).toBeNull();
+                await expect(TogetherSentimentClassifier.classifySentiment("I love you")).toEqual('Good');
+                await expect(TogetherSentimentClassifier.classifySentiment("I hate you")).toEqual('Bad');
+                await expect(TogetherSentimentClassifier.classifySentiment("Wednesdays are in the middle of the week")).toBeNull();
             });
         });
     });

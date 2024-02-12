@@ -1,4 +1,10 @@
 import {approximateTokenCount, decodeInt, encodeInt, userDataDir} from "../src/utils";
+import {Register} from "../src/register";
+import FilesystemBufferedLogger from "../src/trackers/filesystemBufferedLogger";
+import FunctionModeler from "../src/functionModeler";
+import {APIManager} from "../src/APIManager";
+import {FinetuneJob} from "../src/models/finetuneJob";
+import {OpenAIConfig} from "../src/languageModels/llmConfigs/openAIConfig";
 
 describe('approximateTokenCount', () => {
     test('accurately approximates token count for given content', () => {
@@ -65,5 +71,22 @@ describe('encodeInt and decodeInt', () => {
         const encoded = encodeInt(original);
         const decoded = decodeInt(encoded);
         expect(decoded).toBe(original);
+    });
+
+    test('iterate encodings', () => {
+        const ints: number[] = [];
+        const characters: string[] = [];
+
+        for (let i = 0; i < 37; i++) {
+            const character = encodeInt(i);
+            expect(characters).not.toContain(character);
+            characters.push(character);
+
+            const integer = decodeInt(character);
+            expect(ints).not.toContain(integer);
+            ints.push(integer);
+
+            expect(integer).toBe(i);
+        }
     });
 });

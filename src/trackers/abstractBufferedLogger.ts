@@ -329,7 +329,7 @@ abstract class AbstractBufferedLogger implements IDatasetWorker {
         this.writeJson(configPath, functionConfig);
       } else {
         functionConfig = ModelConfigFactory.loadFunctionConfigFromDict(
-          this.readJson(configPath)
+          this.readJson(configPath) as FunctionConfig
         );
       }
     } catch (error) {

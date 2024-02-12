@@ -22,23 +22,20 @@ describe('Instantiate Class Tests', () => {
 
   // Assuming tanuki.align functionality is handled within the test itself
   it('align_action_items', async () => {
-    Tanuki.align(async (it) => {
-      it("alignActionItems", async (expect) => {
-        const goal = "Can you please get the presentation to me by Tuesday?";
-        const nextTuesday = new Date();
-        nextTuesday.setDate(nextTuesday.getDate() + ((1 - nextTuesday.getDay() + 7) % 7));
-        nextTuesday.setHours(0, 0, 0, 0);
+      await Tanuki.align( it => {
+          it("alignActionItems", async expect => {
+              const goal = "Can you please get the presentation to me by Tuesday?";
+              const nextTuesday = new Date();
+              nextTuesday.setDate(nextTuesday.getDate() + ((1 - nextTuesday.getDay() + 7) % 7));
+              nextTuesday.setHours(0, 0, 0, 0);
 
-        const expectedActionItem: ActionItemType = new ActionItem("Prepare the presentation", nextTuesday);
-        const result = await Functions.actionItems(goal);
+              const expectedActionItem: ActionItemType = new ActionItem("Prepare the presentation", nextTuesday);
 
-        // Assuming the result is an array of ActionItems
-        expect(result[0]).toEqual(expectedActionItem);
-      });
-    });
-  })
-    // Assuming tanuki.align functionality is handled within the test itself
-  it('create_action_items', async () => {
+              // Assuming the result is an array of ActionItems
+              await expect(Functions.actionItems(goal)).toEqual(expectedActionItem);
+          });
+      })
+
       const goal = "Can you please get the presentation to me by Wednesday?";
       const nextWednesday = new Date();
       nextWednesday.setDate(nextWednesday.getDate() + ((1 - nextWednesday.getDay() + 7) % 7));
@@ -47,7 +44,6 @@ describe('Instantiate Class Tests', () => {
       const expectedActionItem: ActionItemType = new ActionItem("Prepare the presentation", nextWednesday);
       const result = await Functions.actionItems(goal);
 
-      // Assuming the result is an array of ActionItems
       expect(result[0]).toEqual(expectedActionItem);
-  })
-})
+      })
+  });

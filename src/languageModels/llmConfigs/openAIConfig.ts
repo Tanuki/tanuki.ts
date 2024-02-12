@@ -5,11 +5,13 @@ export class OpenAIConfig extends BaseModelConfig {
   modelName: string;
   provider: string = OPENAI_PROVIDER;
   contextLength: number;
+  baseModelForSft: string;
   constructor(config: {
     modelName: string;
     contextLength: number;
     instructions?: string;
     parsingHelperTokens?: { startToken: string; endToken: string };
+    baseModelForSft?: string;
   }) {
     super({
       modelName: config.modelName,
@@ -21,5 +23,6 @@ export class OpenAIConfig extends BaseModelConfig {
     });
     this.modelName = config.modelName;
     this.contextLength = config.contextLength;
+    this.baseModelForSft = config.baseModelForSft || config.modelName;
   }
 }

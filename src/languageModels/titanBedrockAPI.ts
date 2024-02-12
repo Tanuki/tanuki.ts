@@ -3,38 +3,15 @@ import { BaseModelConfig } from './llmConfigs/baseModelConfig';
 import { TitanBedrockConfig } from './llmConfigs/titanConfig';
 import { Embedding } from '../models/embedding';
 import { FinetuneJob } from '../models/finetuneJob';
+import {Embeddable} from "../APIManager";
 
-export class TitanBedrockAPI extends BedrockAPI {
+export class TitanBedrockAPI extends BedrockAPI implements Embeddable {
   constructor() {
     super(); // Initialize the base class
   }
-
-  generate(
-    model: BaseModelConfig,
-    systemMessage: string,
-    prompt: string,
-    kwargs: {
-      temperature?: number;
-      topP?: number;
-      frequencyPenalty?: number;
-      presencePenalty?: number;
-      maxNewTokens?: number;
-      stop?: string;
-    } = {}
-  ): string {
-    console.debug(
-      'Generating response for Titan Bedrock API with the following parameters: ',
-      kwargs
-    );
-    // Method implementation
-    throw new Error(
-      'Response generations for Titan Bedrock API have not yet been implemented'
-    );
-  }
-
   async embed(
     texts: string[],
-    model: TitanBedrockConfig,
+    model: BaseModelConfig,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     kwargs: any
   ): Promise<Embedding<any>[]> {

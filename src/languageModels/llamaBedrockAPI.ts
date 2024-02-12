@@ -1,14 +1,14 @@
 import { BedrockAPI } from './bedrockAPI';
 import { BaseModelConfig } from './llmConfigs/baseModelConfig';
 import { FinetuneJob } from '../models/finetuneJob';
+import {Inferable} from "../APIManager";
 
 const LLM_GENERATION_PARAMETERS = ['temperature', 'top_p', 'max_new_tokens'];
 
-export class LLamaBedrockAPI extends BedrockAPI {
+export class LLamaBedrockAPI extends BedrockAPI implements Inferable {
   constructor() {
     super();
   }
-
   async generate(
     model: BaseModelConfig,
     systemMessage: string,

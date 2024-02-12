@@ -11,8 +11,6 @@ import {
 import { BaseModelConfig } from './llmConfigs/baseModelConfig';
 import CreateEmbeddingResponse = OpenAI.CreateEmbeddingResponse;
 import { FineTuningJob } from 'openai/resources/fine-tuning';
-import EmbeddingAPI from './embeddingAPI';
-import LLMApi from './LLMApi';
 import * as console from 'console';
 import * as Buffer from 'buffer';
 import * as process from 'process';
@@ -22,16 +20,9 @@ import {
   NotFoundError,
   PermissionDeniedError,
 } from 'openai/error';
+import {Finetunable, Inferable} from "../APIManager";
 
-// const LLM_GENERATION_PARAMETERS: string[] = [
-//   'temperature',
-//   'top_p',
-//   'max_new_tokens',
-//   'frequency_penalty',
-//   'presence_penalty',
-// ];
-
-export class OpenAIAPI implements EmbeddingAPI<number>, LLMApi {
+export class OpenAIAPI implements Finetunable, Inferable {
   private apiKey: string;
   private client: OpenAI;
   private readonly openaiUrl: string =
@@ -167,12 +158,12 @@ export class OpenAIAPI implements EmbeddingAPI<number>, LLMApi {
     return choice.trim();
   }
 
-  public async listFinetuned(limit = 100): Promise<FinetuneJob[]> {
+  public async listFinetuned(modelConfig: OpenAIConfig, limit = 100): Promise<FinetuneJob[]> {
     this.checkApiKey();
     try {
       const response = await this.client.fineTuning.jobs.list({ limit });
       return response.data.map((job: FineTuningJob) => {
-        return this.createFinetuneJob(job);
+        return this.createFinetuneJob(job, modelConfig);
       });
     } catch (error: any) {
       const errorMessage =
@@ -181,25 +172,15 @@ export class OpenAIAPI implements EmbeddingAPI<number>, LLMApi {
     }
   }
 
-  public async getFinetuned(jobId: string): Promise<FinetuneJob> {
+  public async getFinetuned(jobId: string, modelConfig: OpenAIConfig): Promise<FinetuneJob> {
     this.checkApiKey();
     const response: FineTuningJob = await this.client.fineTuning.jobs.retrieve(
       jobId
     );
-    /*const response = await axios.get(`${this.openaiUrl}/fine-tuning/jobs/${jobId}`, {
-          headers: {
-            Authorization: `Bearer ${this.apiKey}`,
-          },
-        }
-      );*/
-    const job = this.createFinetuneJob(response);
+    const job = this.createFinetuneJob(response, modelConfig);
     return job;
   }
-  private createFinetuneJob(response: FineTuningJob): FinetuneJob {
-    const modelConfig = JSON.parse(
-      JSON.stringify(DEFAULT_STUDENT_MODELS[DEFAULT_DISTILLED_MODEL_NAME])
-    ) as BaseModelConfig;
-
+  private createFinetuneJob(response: FineTuningJob, modelConfig: BaseModelConfig): FinetuneJob {
     if (!response.fine_tuned_model) {
       throw new Error('Fine-tuned model not found');
     }
@@ -211,7 +192,8 @@ export class OpenAIAPI implements EmbeddingAPI<number>, LLMApi {
 
   public async finetune(
     fileBuffer: Buffer,
-    suffix: string
+    suffix: string,
+    modelConfig: OpenAIConfig,
   ): Promise<FinetuneJob> {
     this.checkApiKey();
     try {
@@ -224,11 +206,16 @@ export class OpenAIAPI implements EmbeddingAPI<number>, LLMApi {
         purpose: 'fine-tune',
       });
 
+      const trainingFile = fileUploadResponse.id
+      if (!modelConfig.baseModelForSft) {
+        modelConfig.baseModelForSft = DEFAULT_DISTILLED_MODEL_NAME;
+      }
+
       // Start fine-tuning
       const finetuningResponse: FineTuningJob =
         await this.client.fineTuning.jobs.create({
-          training_file: fileUploadResponse.id,
-          model: DEFAULT_DISTILLED_MODEL_NAME,
+          training_file: trainingFile,
+          model: modelConfig.modelName,
           suffix: suffix,
         });
 

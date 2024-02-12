@@ -4,5 +4,6 @@ export interface PatchConfig {
   ignoreFinetuning?: boolean;
   ignoreDataStorage?: boolean;
   teacherModels?: string[];
+  studentModel?: string;
   generationParams?: Record<string, any>;
 }

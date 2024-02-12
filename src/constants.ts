@@ -3,6 +3,7 @@ import { ClaudeConfig } from './languageModels/llmConfigs/claudeConfig';
 import { LlamaBedrockConfig } from './languageModels/llmConfigs/llamaConfig';
 import { TitanBedrockConfig } from './languageModels/llmConfigs/titanConfig';
 import { TogetherAIConfig } from './languageModels/llmConfigs/togetherAIConfig';
+import { AnyscaleConfig } from './languageModels/llmConfigs/anyscaleConfig';
 export const EXAMPLE_ELEMENT_LIMIT = 1000;
 
 // These represent the file extensions for the symbolic patch and alignment datasets
@@ -36,6 +37,8 @@ export const ENVVAR = 'TANUKI_LOG_DIR';
 
 // default models
 export const DEFAULT_TEACHER_MODEL_NAMES = ['gpt-4', 'gpt-4-32k'];
+
+
 export const DEFAULT_DISTILLED_MODEL_NAME = 'gpt-3.5-turbo-1106';
 export const DEFAULT_EMBEDDING_MODEL_NAME = 'ada-002';
 
@@ -45,6 +48,8 @@ export const BEDROCK_PROVIDER = 'bedrock';
 export const LLAMA_BEDROCK_PROVIDER = 'llama_bedrock';
 export const TITAN_BEDROCK_PROVIDER = 'aws_titan_bedrock';
 export const TOGETHER_AI_PROVIDER = 'together_ai';
+export const ANYSCALE_PROVIDER = 'anyscale';
+
 // model type strings
 export const TEACHER_MODEL = 'teacher';
 export const DISTILLED_MODEL = 'distillation';
@@ -120,10 +125,31 @@ export const DEFAULT_TEACHER_MODELS = {
 };
 
 export const DEFAULT_STUDENT_MODELS = {
-  'gpt-3.5-turbo-1106': new OpenAIConfig({
-    modelName: '',
-    contextLength: 14000,
-  }),
+    'gpt-3.5-turbo-1106': new OpenAIConfig({
+      modelName: '',
+      contextLength: 14000,
+      baseModelForSft: "gpt-3.5-turbo-1106"
+    }),
+    "Llama-2-7b-chat-hf": new AnyscaleConfig({
+        modelName: "",
+        contextLength: 3000,
+        baseModelForSft: "meta-llama/Llama-2-7b-chat-hf"
+    }),
+    "Llama-2-13b-chat-hf": new AnyscaleConfig({
+        modelName: "",
+        contextLength: 3000,
+        baseModelForSft: "meta-llama/Llama-2-13b-chat-hf"
+    }),
+    "Llama-2-70b-chat-hf": new AnyscaleConfig({
+        modelName: "",
+        contextLength: 3000,
+        baseModelForSft: "meta-llama/Llama-2-70b-chat-hf"
+    }),
+    "Mistral-7B-Instruct-v0.1": new AnyscaleConfig({
+        modelName: "",
+        contextLength: 3000,
+        baseModelForSft: "mistralai/Mistral-7B-Instruct-v0.1"
+    })
 };
 
 export const DEFAULT_EMBEDDING_MODELS = {

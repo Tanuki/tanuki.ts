@@ -23,13 +23,13 @@ describe('Sentiment Analysis Tests Llama', () => {
     Tanuki.align(async (it) => {
       it("Specify how our functions should behave.", async (expect) => {
         const iLoveYou = "I love you";
-        expect(await LlamaClassifier.classifySentimentLlama3([iLoveYou, "I love woo"])).toEqual('Good');
-        expect(await LlamaClassifier.classifySentimentLlama3(["I hate you", "You're disgusting"])).toEqual('Bad');
-        expect(await LlamaClassifier.classifySentimentLlama3(["Today is wednesday", "The dogs are running outside"])).toBeNull();
+        await expect(LlamaClassifier.classifySentimentLlama3([iLoveYou, "I love woo"])).toEqual('Good');
+        await expect(LlamaClassifier.classifySentimentLlama3(["I hate you", "You're disgusting"])).toEqual('Bad');
+        await expect(LlamaClassifier.classifySentimentLlama3(["Today is wednesday", "The dogs are running outside"])).toBeNull();
 
-        expect(await LlamaClassifier.classifySentimentLlama("I love you")).toEqual('Good');
-        expect(await LlamaClassifier.classifySentimentLlama("I hate you")).toEqual('Bad');
-        expect(await LlamaClassifier.classifySentimentLlama("Wednesdays are in the middle of the week")).toBeNull();
+        await expect(LlamaClassifier.classifySentimentLlama("I love you")).toEqual('Good');
+        await expect(LlamaClassifier.classifySentimentLlama("I hate you")).toEqual('Bad');
+        await expect(LlamaClassifier.classifySentimentLlama("Wednesdays are in the middle of the week")).toBeNull();
       })
     })
   });

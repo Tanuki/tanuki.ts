@@ -186,10 +186,11 @@ export class Register {
   }*/
   // @ts-ignore
   static getNamedFunctions(
-    classContext: { name: string; sourceFile: string },
+    classContext: any,
     docstring: string
   ): FunctionDescription {
-    const className = classContext.name;
+    const _this = classContext as unknown as { name: string; sourceFile: string }; // Doing this for readability
+    const className = _this.name;
 
     const filterFunctions = (
       functions: Record<string, Record<string, FunctionDescription>>
@@ -199,7 +200,7 @@ export class Register {
       const values = Object.values(classFunctions);
 
       return values
-        .filter(funcDesc => funcDesc.parentName === classContext.name)
+        .filter(funcDesc => funcDesc.parentName === _this.name)
         .filter(
           funcDesc => docstring === '' || funcDesc.docstring === docstring
         )
@@ -223,12 +224,12 @@ export class Register {
     }
     // If no function is found, throw an error
     if (allFunctions.length === 0) {
-      if (className === undefined && classContext.name === undefined) {
+      if (className === undefined && _this.name === undefined) {
         throw new Error(
           `Function not resolved. Ensure your Tanuki functions are static class members. Ref:${docstring} not found.`
         );
       }
-      if (classContext.sourceFile === undefined) {
+      if (_this.sourceFile === undefined) {
         throw new Error(
           `Function with name "${className}" and docstring "${docstring}" not found in class "${classContext.name}". Ensure you build your functions with the Tanuki compiler. Ref: "${docstring}"`
         );
@@ -253,7 +254,7 @@ export class Register {
     //
     // return [...symbolicFunctionNames, ...embeddingFunctionNames];
   }
-  /*static loadFunctionDescription(parentName: string, functionName: string, docString: string): FunctionDescription {
+  static loadFunctionDescription(parentName: string, functionName: string, docString: string): FunctionDescription {
     // Iterate over alignableSymbolicFunctions
     for (const key in this.alignableSymbolicFunctions) {
       if (this.alignableSymbolicFunctions[parentName][key].name === functionName && this.alignableSymbolicFunctions[parentName][key].docstring.trim() === docString.trim()) {
@@ -269,7 +270,7 @@ export class Register {
     }
     // If no match is found
     throw new Error(`FunctionDescription with name "${functionName}" and docString "${docString}" not found.`);
-  }*/
+  }
   /*const { name, docstring, inputTypeHints, outputTypeHint, type } = funcObject;
 
     const functionDescription: FunctionDescription = {

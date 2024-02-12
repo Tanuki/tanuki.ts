@@ -1,6 +1,7 @@
 import {FunctionDescription} from "../../src/models/functionDescription";
 
 // Extend the jest module to include typings for our mocks - a bit of a hack.
+// @ts-ignore
 declare module 'jest' {
   interface Jest {
     // Extend the function prototype to include the custom static method
@@ -120,15 +121,16 @@ describe('handleAlignStatement', () => {
     });
   })
 
+  class Functions {
+    static func = patch<string, string>()`This is a mock function`;
+  }
+
   it('executes test suite and calls saveSymbolicAlignStatements for symbolic functions', async () => {
 
       // Test Tanuki.align with a mocked test suite
       await Tanuki.align(it => {
         it('mock test', async expect => {
-          const func = patch()`This is an instruction`;
-          // @ts-ignore
-          const result = await func("love") // Simulate calling a patched function
-          await expect(result).toEqual("Good");
+          await expect(Functions.func("love")).toEqual("Good");
         });
       });
 

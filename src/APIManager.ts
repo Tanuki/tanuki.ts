@@ -3,19 +3,23 @@ import {
   LLAMA_BEDROCK_PROVIDER,
   TITAN_BEDROCK_PROVIDER,
   TOGETHER_AI_PROVIDER,
+  ANYSCALE_PROVIDER
 } from './constants';
 import { FinetuneJob } from './models/finetuneJob';
 import { Embedding } from './models/embedding';
 import { BaseModelConfig } from './languageModels/llmConfigs/baseModelConfig';
+import {OpenAIConfig} from "./languageModels/llmConfigs/openAIConfig";
+import Buffer from "buffer";
 
 export interface Finetunable {
-  listFinetuned: (limit: number) => Promise<FinetuneJob[]>;
-  getFinetuned: (jobId: string) => Promise<FinetuneJob>;
-  finetune: (fileBuffer: Buffer, suffix: string) => Promise<FinetuneJob>;
+  listFinetuned: (modelConfig: OpenAIConfig, limit: number, ...args: any[]) => Promise<FinetuneJob[]>;
+  getFinetuned: (jobId: string, modelConfig: OpenAIConfig) => Promise<FinetuneJob>;
+  finetune: (fileBuffer: Buffer,  suffix: string, modelConfig: OpenAIConfig,) => Promise<FinetuneJob>;
 }
+
 export interface Inferable {
   generate: (
-    model: BaseModelConfig | string,
+    model: BaseModelConfig,
     systemMessage: string,
     prompt: any,
     kwargs: any
@@ -24,7 +28,7 @@ export interface Inferable {
 export interface Embeddable {
   embed: (
     texts: string[],
-    model: BaseModelConfig | string,
+    model: BaseModelConfig,
     kwargs: any
   ) => Promise<Embedding<any>[]>;
 }
@@ -50,9 +54,26 @@ class APIManager {
   }
 
   private async addApiProvider(provider: string): Promise<void> {
-    if (provider === OPENAI_PROVIDER) {
+    if (provider === ANYSCALE_PROVIDER) {
+      const { AnyscaleAPI } = await import('./languageModels/anyscaleAPI');
+      try {
+        this.apiProviders[provider] = new AnyscaleAPI();
+      } catch (e) {
+        throw new Error(
+            `You need to install the openai package to use the Anyscale api provider. 
+                      Please install it with \`pip install openai\``
+        )
+      }
+    } else if (provider === OPENAI_PROVIDER) {
       const { OpenAIAPI } = await import('./languageModels/openAIAPI');
-      this.apiProviders[provider] = new OpenAIAPI();
+      try {
+        this.apiProviders[provider] = new OpenAIAPI();
+      } catch (e) {
+        throw new Error(
+            `You need to install the openai package to use the OpenAI api provider. 
+                        Please install it with \`pip install openai\``
+        )
+      }
     } else if (provider === LLAMA_BEDROCK_PROVIDER) {
       const { LLamaBedrockAPI } = await import(
         './languageModels/llamaBedrockAPI'
