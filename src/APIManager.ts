@@ -3,18 +3,29 @@ import {
   LLAMA_BEDROCK_PROVIDER,
   TITAN_BEDROCK_PROVIDER,
   TOGETHER_AI_PROVIDER,
-  ANYSCALE_PROVIDER
+  ANYSCALE_PROVIDER,
 } from './constants';
 import { FinetuneJob } from './models/finetuneJob';
 import { Embedding } from './models/embedding';
 import { BaseModelConfig } from './languageModels/llmConfigs/baseModelConfig';
-import {OpenAIConfig} from "./languageModels/llmConfigs/openAIConfig";
-import Buffer from "buffer";
+import { OpenAIConfig } from './languageModels/llmConfigs/openAIConfig';
+import Buffer from 'buffer';
 
 export interface Finetunable {
-  listFinetuned: (modelConfig: OpenAIConfig, limit: number, ...args: any[]) => Promise<FinetuneJob[]>;
-  getFinetuned: (jobId: string, modelConfig: OpenAIConfig) => Promise<FinetuneJob>;
-  finetune: (fileBuffer: Buffer,  suffix: string, modelConfig: OpenAIConfig,) => Promise<FinetuneJob>;
+  listFinetuned: (
+    modelConfig: OpenAIConfig,
+    limit: number,
+    ...args: any[]
+  ) => Promise<FinetuneJob[]>;
+  getFinetuned: (
+    jobId: string,
+    modelConfig: OpenAIConfig
+  ) => Promise<FinetuneJob>;
+  finetune: (
+    fileBuffer: Buffer,
+    suffix: string,
+    modelConfig: OpenAIConfig
+  ) => Promise<FinetuneJob>;
 }
 
 export interface Inferable {
@@ -60,9 +71,9 @@ class APIManager {
         this.apiProviders[provider] = new AnyscaleAPI();
       } catch (e) {
         throw new Error(
-            `You need to install the openai package to use the Anyscale api provider. 
+          `You need to install the openai package to use the Anyscale api provider. 
                       Please install it with \`pip install openai\``
-        )
+        );
       }
     } else if (provider === OPENAI_PROVIDER) {
       const { OpenAIAPI } = await import('./languageModels/openAIAPI');
@@ -70,9 +81,9 @@ class APIManager {
         this.apiProviders[provider] = new OpenAIAPI();
       } catch (e) {
         throw new Error(
-            `You need to install the openai package to use the OpenAI api provider. 
+          `You need to install the openai package to use the OpenAI api provider. 
                         Please install it with \`pip install openai\``
-        )
+        );
       }
     } else if (provider === LLAMA_BEDROCK_PROVIDER) {
       const { LLamaBedrockAPI } = await import(

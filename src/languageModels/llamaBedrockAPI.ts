@@ -1,7 +1,7 @@
 import { BedrockAPI } from './bedrockAPI';
 import { BaseModelConfig } from './llmConfigs/baseModelConfig';
 import { FinetuneJob } from '../models/finetuneJob';
-import {Inferable} from "../APIManager";
+import { Inferable } from '../APIManager';
 
 const LLM_GENERATION_PARAMETERS = ['temperature', 'top_p', 'max_new_tokens'];
 

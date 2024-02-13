@@ -78,10 +78,10 @@ export class FunctionModeler {
    * @param taskType
    */
   static configureFunctionModels(
-      funcHash: string,
-      taskType: FunctionType,
-      teacherModels?: string[],
-      studentModel?: string,
+    funcHash: string,
+    taskType: FunctionType,
+    teacherModels?: string[],
+    studentModel?: string
   ) {
     if (teacherModels) {
       FunctionModeler.configureTeacherModels(teacherModels, funcHash, taskType);
@@ -91,7 +91,9 @@ export class FunctionModeler {
     }
 
     if (teacherModels && !studentModel) {
-      for (const teacherModel of FunctionModeler.teacherModelsOverride[funcHash]) {
+      for (const teacherModel of FunctionModeler.teacherModelsOverride[
+        funcHash
+      ]) {
         if (teacherModel.provider !== OPENAI_PROVIDER) {
           if (!FunctionModeler.checkFinetuneBlacklist.has(funcHash)) {
             FunctionModeler.checkFinetuneBlacklist.add(funcHash);
@@ -136,19 +138,23 @@ export class FunctionModeler {
     taskType: FunctionType
   ): void {
     if (taskType === FunctionType.EMBEDDABLE) {
-        // TODO: Support student models for embeddable function distillation
-        console.info('Embeddable function type does not support student models');
-        return;
+      // TODO: Support student models for embeddable function distillation
+      console.info('Embeddable function type does not support student models');
+      return;
     }
     const preconfiguredModels = DEFAULT_STUDENT_MODELS;
 
     if (!(studentModel in preconfiguredModels)) {
-      throw new Error(`Student model ${studentModel} is currently not supported.`);
+      throw new Error(
+        `Student model ${studentModel} is currently not supported.`
+      );
     } else {
-      const modelConfig = preconfiguredModels[studentModel as keyof typeof DEFAULT_STUDENT_MODELS] ;
+      const modelConfig =
+        preconfiguredModels[
+          studentModel as keyof typeof DEFAULT_STUDENT_MODELS
+        ];
       FunctionModeler.studentModelOverride[funcHash] = modelConfig;
     }
-
   }
 
   static configureTeacherModels(
@@ -235,8 +241,8 @@ export class FunctionModeler {
     functionHash: string,
     args: any[],
     //kwargs: Record<string, any>,
-    positivePairs: Array<any[]>,//, Record<string, any>]>,
-    negativePairs: Array<any[]>//, Record<string, any>]>
+    positivePairs: Array<any[]>, //, Record<string, any>]>,
+    negativePairs: Array<any[]> //, Record<string, any>]>
   ): void {
     // Prepare args and kwargs for saving
     const parsedArgs = this.prepareObjectForSaving(args);
@@ -271,7 +277,7 @@ export class FunctionModeler {
   private saveContrastiveAlignmentPair(
     functionHash: string,
     args: any[],
-    pair: Array<any[]>,//, Record<string, any>],
+    pair: Array<any[]>, //, Record<string, any>],
     positive: boolean
   ): void {
     const example = new FunctionExample(args, pair); // The args of the first, and the args of the second
@@ -491,10 +497,12 @@ export class FunctionModeler {
   ): Promise<FunctionConfig> {
     const [config, defaultUsed] = this.dataWorker.loadFunctionConfig(funcHash);
 
-    if (FunctionModeler.studentModelOverride &&
-        funcHash in FunctionModeler.studentModelOverride &&
-        config.distilledModel.modelName === '') {
-        config.distilledModel = FunctionModeler.studentModelOverride[funcHash];
+    if (
+      FunctionModeler.studentModelOverride &&
+      funcHash in FunctionModeler.studentModelOverride &&
+      config.distilledModel.modelName === ''
+    ) {
+      config.distilledModel = FunctionModeler.studentModelOverride[funcHash];
     }
 
     //const finetuneProvider: string = config.distilledModel.provider;
@@ -520,7 +528,7 @@ export class FunctionModeler {
     modelConfig: BaseModelConfig
   ): Promise<[boolean, FunctionConfig]> {
     console.info(
-      `Checking for finetunes for ${functionDescription.name} using ${modelConfig}`
+      `Checking for finetunes for ${functionDescription.name} using ${modelConfig.modelName}`
     );
     const environmentId = encodeInt(FunctionModeler.environmentId) || '';
     const finetuneHash =
@@ -619,7 +627,8 @@ export class FunctionModeler {
     const funcHash = functionDescription.hash();
     let funcConfig: FunctionConfig;
 
-    if (this.functionConfigs[funcHash]){//funcHash in this.functionConfigs) {
+    if (this.functionConfigs[funcHash]) {
+      //funcHash in this.functionConfigs) {
       funcConfig = this.functionConfigs[funcHash];
     } else {
       funcConfig = await this.loadFunctionConfig(funcHash, functionDescription);
@@ -823,7 +832,7 @@ export class FunctionModeler {
       const finetuningResponse: FinetuneJob = await provider.finetune(
         datasetBuffer,
         finetuneHash,
-          this.functionConfigs[funcHash as keyof typeof this.functionConfigs].distilledModel
+        this.functionConfigs[funcHash].distilledModel
       );
 
       this.functionConfigs[funcHash].currentTrainingRun = {
@@ -867,7 +876,10 @@ export class FunctionModeler {
         const provider = (await this.apiManager.getProvider(
           finetuneProvider
         )) as Finetunable;
-        const response: FinetuneJob = await provider.getFinetuned(jobId, this.functionConfigs[funcHash].distilledModel);
+        const response: FinetuneJob = await provider.getFinetuned(
+          jobId,
+          this.functionConfigs[funcHash].distilledModel
+        );
         this.functionConfigs[funcHash].currentTrainingRun.lastChecked =
           now.toISOString();
 

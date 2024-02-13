@@ -1,9 +1,8 @@
 import { BedrockAPI } from './bedrockAPI';
 import { BaseModelConfig } from './llmConfigs/baseModelConfig';
-import { TitanBedrockConfig } from './llmConfigs/titanConfig';
 import { Embedding } from '../models/embedding';
 import { FinetuneJob } from '../models/finetuneJob';
-import {Embeddable} from "../APIManager";
+import { Embeddable } from '../APIManager';
 
 export class TitanBedrockAPI extends BedrockAPI implements Embeddable {
   constructor() {

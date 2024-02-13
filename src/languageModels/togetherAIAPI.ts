@@ -1,9 +1,6 @@
-import LLMApi from './LLMApi';
 import { TogetherAIConfig } from './llmConfigs/togetherAIConfig';
-import LLMFinetuneAPI from './LLMFinetuneAPI';
-import { FinetuneJob } from '../models/finetuneJob';
-import {Inferable} from "../APIManager";
-import {BaseModelConfig} from "./llmConfigs/baseModelConfig";
+import { Inferable } from '../APIManager';
+import { BaseModelConfig } from './llmConfigs/baseModelConfig';
 
 // Assuming you have similar configurations as in the Python code
 const TOGETHER_AI_URL = 'https://api.together.xyz/inference';
@@ -124,12 +121,8 @@ export class TogetherAIAPI implements Inferable {
     if (!this.modelConfigs[modelName]) {
       // Assuming `together.Models.info` is similar to OpenAI client usage
       // You might need to adjust this part based on your actual implementation
-      this.modelConfigs[modelName] = await this.fetchModelInfo(
-        modelName
-      );
-
+      this.modelConfigs[modelName] = await this.fetchModelInfo(modelName);
     }
-
 
     const generationParams: {
       temperature: number;

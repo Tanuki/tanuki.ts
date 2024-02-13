@@ -20,7 +20,7 @@ import {
   NotFoundError,
   PermissionDeniedError,
 } from 'openai/error';
-import {Finetunable, Inferable} from "../APIManager";
+import { Finetunable, Inferable } from '../APIManager';
 
 export class OpenAIAPI implements Finetunable, Inferable {
   private apiKey: string;
@@ -158,7 +158,10 @@ export class OpenAIAPI implements Finetunable, Inferable {
     return choice.trim();
   }
 
-  public async listFinetuned(modelConfig: OpenAIConfig, limit = 100): Promise<FinetuneJob[]> {
+  public async listFinetuned(
+    modelConfig: OpenAIConfig,
+    limit = 100
+  ): Promise<FinetuneJob[]> {
     this.checkApiKey();
     try {
       const response = await this.client.fineTuning.jobs.list({ limit });
@@ -172,7 +175,10 @@ export class OpenAIAPI implements Finetunable, Inferable {
     }
   }
 
-  public async getFinetuned(jobId: string, modelConfig: OpenAIConfig): Promise<FinetuneJob> {
+  public async getFinetuned(
+    jobId: string,
+    modelConfig: OpenAIConfig
+  ): Promise<FinetuneJob> {
     this.checkApiKey();
     const response: FineTuningJob = await this.client.fineTuning.jobs.retrieve(
       jobId
@@ -180,7 +186,10 @@ export class OpenAIAPI implements Finetunable, Inferable {
     const job = this.createFinetuneJob(response, modelConfig);
     return job;
   }
-  private createFinetuneJob(response: FineTuningJob, modelConfig: BaseModelConfig): FinetuneJob {
+  private createFinetuneJob(
+    response: FineTuningJob,
+    modelConfig: BaseModelConfig
+  ): FinetuneJob {
     if (!response.fine_tuned_model) {
       throw new Error('Fine-tuned model not found');
     }
@@ -193,7 +202,7 @@ export class OpenAIAPI implements Finetunable, Inferable {
   public async finetune(
     fileBuffer: Buffer,
     suffix: string,
-    modelConfig: OpenAIConfig,
+    modelConfig: OpenAIConfig
   ): Promise<FinetuneJob> {
     this.checkApiKey();
     try {
@@ -206,7 +215,7 @@ export class OpenAIAPI implements Finetunable, Inferable {
         purpose: 'fine-tune',
       });
 
-      const trainingFile = fileUploadResponse.id
+      const trainingFile = fileUploadResponse.id;
       if (!modelConfig.baseModelForSft) {
         modelConfig.baseModelForSft = DEFAULT_DISTILLED_MODEL_NAME;
       }

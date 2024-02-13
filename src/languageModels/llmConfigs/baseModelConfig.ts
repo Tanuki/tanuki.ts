@@ -36,7 +36,7 @@ export class BaseModelConfig {
       startToken: '',
       endToken: '',
     };
-    this.baseModelForSft = "";
+    this.baseModelForSft = '';
     this.instructions = config.instructions || this.instructions;
   }
 }

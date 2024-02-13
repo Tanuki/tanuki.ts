@@ -12,7 +12,6 @@ import { FunctionType } from './models/functionType';
 import { APIManager } from './APIManager';
 import {
   DEFAULT_DISTILLED_MODEL_NAME,
-  DEFAULT_EMBEDDING_MODEL_NAME, DEFAULT_STUDENT_MODELS,
   DEFAULT_TEACHER_MODEL_NAMES,
 } from './constants';
 dotenv.config();
@@ -70,7 +69,7 @@ function isMockResponseType(obj: any): obj is MockResponseType {
 
 export class Tanuki {
   private static isAlignActive = false;
-  constructor() { }
+  constructor() {}
 
   static isWithinAlign() {
     return this.isAlignActive;
@@ -90,21 +89,19 @@ export class Tanuki {
         expected,
         equal,
       }: {
-        actual: { functionDescription: FunctionDescription; input: any[] } | null;
+        actual: {
+          functionDescription: FunctionDescription;
+          input: any[];
+        } | null;
         expected: { functionDescription: FunctionDescription; input: any[] };
         equal: boolean;
       }) {
         const functionDescription =
-            expected.functionDescription as unknown as FunctionDescription;
+          expected.functionDescription as unknown as FunctionDescription;
         const input = expected.input;
         if (functionDescription.type === FunctionType.SYMBOLIC) {
           const funcHash = functionDescription.hash();
-          functionModeler.saveSymbolicAlignStatements(
-            funcHash,
-            input,
-            actual
-          );
-
+          functionModeler.saveSymbolicAlignStatements(funcHash, input, actual);
         } else {
           if (isMockResponseType(actual)) {
             //expected
@@ -126,9 +123,18 @@ export class Tanuki {
           }
         }
       }
-      const expect: ExpectFunctionType = expected => {
+      const expect: ExpectFunctionType = (expected: {
+        functionDescription: FunctionDescription;
+        input: any[];
+      }) => {
         const baseExpectation = async (
-          actual: Promise<{ functionDescription: FunctionDescription; input: any[] }> | { functionDescription: FunctionDescription; input: any[] } | null,
+          actual:
+            | Promise<{
+                functionDescription: FunctionDescription;
+                input: any[];
+              }>
+            | { functionDescription: FunctionDescription; input: any[] }
+            | null,
           equal: boolean
         ) => {
           /*const awaitedExpected: {
@@ -142,8 +148,8 @@ export class Tanuki {
           }
 
           if (
-              expected?.functionDescription.type !== FunctionType.SYMBOLIC &&
-              expected?.functionDescription.type !== FunctionType.EMBEDDABLE
+            expected?.functionDescription.type !== FunctionType.SYMBOLIC &&
+            expected?.functionDescription.type !== FunctionType.EMBEDDABLE
           ) {
             throw new Error(
               'Expected function type to be either symbolic or embeddable'
@@ -151,12 +157,14 @@ export class Tanuki {
           }
 
           const expectedFunctionName = expected?.functionDescription.name;
-          const expectedFunctionDocstring = expected?.functionDescription.docstring;
+          const expectedFunctionDocstring =
+            expected?.functionDescription.docstring;
 
           if (
-              expected?.functionDescription.type !== FunctionType.SYMBOLIC &&
-              (expected?.functionDescription.name !== expectedFunctionName
-              || expected?.functionDescription.docstring !== expectedFunctionDocstring)
+            expected?.functionDescription.type !== FunctionType.SYMBOLIC &&
+            (expected?.functionDescription.name !== expectedFunctionName ||
+              expected?.functionDescription.docstring !==
+                expectedFunctionDocstring)
           ) {
             throw new Error(
               'Expected embedding function descriptions to match, but they did not. Embeddable functions must be aligned with invocations of the same function in order to train the embedding space.'
@@ -165,24 +173,54 @@ export class Tanuki {
 
           handleAlignStatement({
             actual: awaitedActual,
-            expected: await expected,
+            expected: expected,
             equal: equal,
           });
         };
 
         const baseObj = {
-          toMatchObject: (expected: Promise<{ functionDescription: FunctionDescription; input: any[] }>) => baseExpectation(expected, true),
-          toEqual: (expected: Promise<{functionDescription: FunctionDescription; input: any[] }>) => baseExpectation(expected, true),
-          toBe: (expected: Promise<{functionDescription: FunctionDescription; input: any[] }>) => baseExpectation(expected, true),
+          toMatchObject: (
+            expected: Promise<{
+              functionDescription: FunctionDescription;
+              input: any[];
+            }>
+          ) => baseExpectation(expected, true),
+          toEqual: (
+            expected: Promise<{
+              functionDescription: FunctionDescription;
+              input: any[];
+            }>
+          ) => baseExpectation(expected, true),
+          toBe: (
+            expected: Promise<{
+              functionDescription: FunctionDescription;
+              input: any[];
+            }>
+          ) => baseExpectation(expected, true),
           toBeNull: () => baseExpectation(null, true),
         };
 
         return {
           ...baseObj,
           not: {
-            toMatchObject: (expected: Promise<{ functionDescription: FunctionDescription; input: any[] }>) => baseExpectation(expected, false),
-            toEqual: (expected: Promise<{ functionDescription: FunctionDescription; input: any[] }>) => baseExpectation(expected, false),
-            toBe: (expected: Promise<{ functionDescription: FunctionDescription; input: any[] }>) => baseExpectation(expected, false),
+            toMatchObject: (
+              expected: Promise<{
+                functionDescription: FunctionDescription;
+                input: any[];
+              }>
+            ) => baseExpectation(expected, false),
+            toEqual: (
+              expected: Promise<{
+                functionDescription: FunctionDescription;
+                input: any[];
+              }>
+            ) => baseExpectation(expected, false),
+            toBe: (
+              expected: Promise<{
+                functionDescription: FunctionDescription;
+                input: any[];
+              }>
+            ) => baseExpectation(expected, false),
             toBeNull: () => baseExpectation(null, false),
           },
         };
@@ -225,11 +263,11 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
     }
 
     // Return a function that takes an input of type InputType and returns a value of type OutputType
-    return async function (
-      this: any,
-      input: InputType
-    ): Promise<OutputType> {
-      const parentClass = this as unknown as { name: string; sourceFile: string }; // Doing this for readability
+    return async function (this: any, input: InputType): Promise<OutputType> {
+      const parentClass = this as unknown as {
+        name: string;
+        sourceFile: string;
+      }; // Doing this for readability
       const functionDescription = Register.getNamedFunctions(
         parentClass,
         docstring
@@ -253,12 +291,11 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
       }
 
       FunctionModeler.configureFunctionModels(
-          functionDescription.hash(),
-          functionDescription.type,
-          config?.teacherModels || DEFAULT_TEACHER_MODEL_NAMES,
-          config?.studentModel || DEFAULT_DISTILLED_MODEL_NAME,
+        functionDescription.hash(),
+        functionDescription.type,
+        config?.teacherModels || DEFAULT_TEACHER_MODEL_NAMES,
+        config?.studentModel || DEFAULT_DISTILLED_MODEL_NAME
       );
-
 
       // Flag that we are within a tanuki.align block
       if (Tanuki.isWithinAlign()) {

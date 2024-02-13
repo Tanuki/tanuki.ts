@@ -38,7 +38,6 @@ export const ENVVAR = 'TANUKI_LOG_DIR';
 // default models
 export const DEFAULT_TEACHER_MODEL_NAMES = ['gpt-4', 'gpt-4-32k'];
 
-
 export const DEFAULT_DISTILLED_MODEL_NAME = 'gpt-3.5-turbo-1106';
 export const DEFAULT_EMBEDDING_MODEL_NAME = 'ada-002';
 
@@ -125,31 +124,31 @@ export const DEFAULT_TEACHER_MODELS = {
 };
 
 export const DEFAULT_STUDENT_MODELS = {
-    'gpt-3.5-turbo-1106': new OpenAIConfig({
-      modelName: '',
-      contextLength: 14000,
-      baseModelForSft: "gpt-3.5-turbo-1106"
-    }),
-    "Llama-2-7b-chat-hf": new AnyscaleConfig({
-        modelName: "",
-        contextLength: 3000,
-        baseModelForSft: "meta-llama/Llama-2-7b-chat-hf"
-    }),
-    "Llama-2-13b-chat-hf": new AnyscaleConfig({
-        modelName: "",
-        contextLength: 3000,
-        baseModelForSft: "meta-llama/Llama-2-13b-chat-hf"
-    }),
-    "Llama-2-70b-chat-hf": new AnyscaleConfig({
-        modelName: "",
-        contextLength: 3000,
-        baseModelForSft: "meta-llama/Llama-2-70b-chat-hf"
-    }),
-    "Mistral-7B-Instruct-v0.1": new AnyscaleConfig({
-        modelName: "",
-        contextLength: 3000,
-        baseModelForSft: "mistralai/Mistral-7B-Instruct-v0.1"
-    })
+  'gpt-3.5-turbo-1106': new OpenAIConfig({
+    modelName: '',
+    contextLength: 14000,
+    baseModelForSft: 'gpt-3.5-turbo-1106',
+  }),
+  'Llama-2-7b-chat-hf': new AnyscaleConfig({
+    modelName: '',
+    contextLength: 3000,
+    baseModelForSft: 'meta-llama/Llama-2-7b-chat-hf',
+  }),
+  'Llama-2-13b-chat-hf': new AnyscaleConfig({
+    modelName: '',
+    contextLength: 3000,
+    baseModelForSft: 'meta-llama/Llama-2-13b-chat-hf',
+  }),
+  'Llama-2-70b-chat-hf': new AnyscaleConfig({
+    modelName: '',
+    contextLength: 3000,
+    baseModelForSft: 'meta-llama/Llama-2-70b-chat-hf',
+  }),
+  'Mistral-7B-Instruct-v0.1': new AnyscaleConfig({
+    modelName: '',
+    contextLength: 3000,
+    baseModelForSft: 'mistralai/Mistral-7B-Instruct-v0.1',
+  }),
 };
 
 export const DEFAULT_EMBEDDING_MODELS = {

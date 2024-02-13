@@ -92,8 +92,7 @@ export class Register {
         undefined,
         undefined,
         pfj.inputTypeSchema,
-        pfj.outputTypeSchema,
-
+        pfj.outputTypeSchema
       );
       if (pf.type === FunctionType.SYMBOLIC) {
         // Ensure the parentName key exists in the alignableSymbolicFunctions object
@@ -189,7 +188,10 @@ export class Register {
     classContext: any,
     docstring: string
   ): FunctionDescription {
-    const _this = classContext as unknown as { name: string; sourceFile: string }; // Doing this for readability
+    const _this = classContext as unknown as {
+      name: string;
+      sourceFile: string;
+    }; // Doing this for readability
     const className = _this.name;
 
     const filterFunctions = (
@@ -231,11 +233,11 @@ export class Register {
       }
       if (_this.sourceFile === undefined) {
         throw new Error(
-          `Function with name "${className}" and docstring "${docstring}" not found in class "${classContext.name}". Ensure you build your functions with the Tanuki compiler. Ref: "${docstring}"`
+          `Function with name "${className}" and docstring "${docstring}" not found in class "${_this.name}". Ensure you build your functions with the Tanuki compiler. Ref: "${docstring}"`
         );
       }
       throw new Error(
-        `Function with name "${className}" and docstring "${docstring}" not found in class "${classContext.name}". Check source file: "${classContext.sourceFile}"`
+        `Function with name "${className}" and docstring "${docstring}" not found in class "${_this.name}". Check source file: "${_this.sourceFile}"`
       );
     }
     return allFunctions[0];
@@ -254,22 +256,38 @@ export class Register {
     //
     // return [...symbolicFunctionNames, ...embeddingFunctionNames];
   }
-  static loadFunctionDescription(parentName: string, functionName: string, docString: string): FunctionDescription {
+  static loadFunctionDescription(
+    parentName: string,
+    functionName: string,
+    docString: string
+  ): FunctionDescription {
     // Iterate over alignableSymbolicFunctions
     for (const key in this.alignableSymbolicFunctions) {
-      if (this.alignableSymbolicFunctions[parentName][key].name === functionName && this.alignableSymbolicFunctions[parentName][key].docstring.trim() === docString.trim()) {
+      if (
+        this.alignableSymbolicFunctions[parentName][key].name ===
+          functionName &&
+        this.alignableSymbolicFunctions[parentName][key].docstring.trim() ===
+          docString.trim()
+      ) {
         return this.alignableSymbolicFunctions[parentName][key];
       }
     }
 
     // Iterate over alignableEmbeddingFunctions
     for (const key in this.alignableEmbeddingFunctions) {
-      if (this.alignableEmbeddingFunctions[parentName][key].name === functionName && this.alignableEmbeddingFunctions[parentName][key].docstring.trim() === docString.trim()) {
+      if (
+        this.alignableEmbeddingFunctions[parentName][key].name ===
+          functionName &&
+        this.alignableEmbeddingFunctions[parentName][key].docstring.trim() ===
+          docString.trim()
+      ) {
         return this.alignableEmbeddingFunctions[parentName][key];
       }
     }
     // If no match is found
-    throw new Error(`FunctionDescription with name "${functionName}" and docString "${docString}" not found.`);
+    throw new Error(
+      `FunctionDescription with name "${functionName}" and docString "${docString}" not found.`
+    );
   }
   /*const { name, docstring, inputTypeHints, outputTypeHint, type } = funcObject;
 
