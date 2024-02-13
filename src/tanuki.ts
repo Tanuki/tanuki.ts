@@ -11,7 +11,7 @@ import * as dotenv from 'dotenv';
 import { FunctionType } from './models/functionType';
 import { APIManager } from './APIManager';
 import {
-  DEFAULT_EMBEDDING_MODEL_NAME,
+  DEFAULT_DISTILLED_MODEL_NAME,
   DEFAULT_TEACHER_MODEL_NAMES,
 } from './constants';
 dotenv.config();
@@ -69,35 +69,7 @@ function isMockResponseType(obj: any): obj is MockResponseType {
 
 export class Tanuki {
   private static isAlignActive = false;
-  constructor() {
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    /*const configPath = ts.findConfigFile(
-      './',
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      fs.existsSync,
-      //ts.sys.fileExists,
-      'tsconfig.json'
-    );
-    if (!configPath) {
-      throw new Error("Could not find a valid 'tsconfig.json'.");
-    }
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
-    const parsedConfig = ts.parseJsonConfigFileContent(
-      configFile.config,
-      ts.sys,
-      path.dirname(configPath)
-    );
-    // Create a TypeScript program with the parsed configuration
-    const program = ts.createProgram(
-      parsedConfig.fileNames,
-      parsedConfig.options
-    );
-    const patchFunctionCompiler = new PatchFunctionCompiler(program);
-    patchFunctionCompiler.compile();
-
-     */
-  }
+  constructor() {}
 
   static isWithinAlign() {
     return this.isAlignActive;
@@ -117,27 +89,27 @@ export class Tanuki {
         expected,
         equal,
       }: {
-        actual: { functionDescription: FunctionDescription; input: any[] };
+        actual: {
+          functionDescription: FunctionDescription;
+          input: any[];
+        } | null;
         expected: { functionDescription: FunctionDescription; input: any[] };
         equal: boolean;
       }) {
         const functionDescription =
-          actual.functionDescription as unknown as FunctionDescription;
-        const input = actual.input;
+          expected.functionDescription as unknown as FunctionDescription;
+        const input = expected.input;
         if (functionDescription.type === FunctionType.SYMBOLIC) {
-          functionModeler.saveSymbolicAlignStatements(
-            functionDescription.hash(),
-            input,
-            expected
-          );
+          const funcHash = functionDescription.hash();
+          functionModeler.saveSymbolicAlignStatements(funcHash, input, actual);
         } else {
-          if (isMockResponseType(expected)) {
+          if (isMockResponseType(actual)) {
             //expected
             if (equal) {
               functionModeler.saveEmbeddableAlignStatements(
                 functionDescription.hash(),
                 input,
-                [expected.input],
+                [actual.input],
                 []
               );
             } else {
@@ -145,24 +117,54 @@ export class Tanuki {
                 functionDescription.hash(),
                 input,
                 [],
-                [expected.input]
+                [actual.input]
               );
             }
           }
         }
       }
-      const expect: ExpectFunctionType = actual => {
+      const expect: ExpectFunctionType = (expected: {
+        functionDescription: FunctionDescription;
+        input: any[];
+      }) => {
         const baseExpectation = async (
-          expected: any, //{ functionDescription: FunctionDescription; input: any[] },
+          actual:
+            | Promise<{
+                functionDescription: FunctionDescription;
+                input: any[];
+              }>
+            | { functionDescription: FunctionDescription; input: any[] }
+            | null,
           equal: boolean
         ) => {
-          const awaitedActual: {
+          /*const awaitedExpected: {
             functionDescription: FunctionDescription;
             input: any[];
-          } = await actual;
+          } = await actual;*/
+          const awaitedActual = await actual;
+
+          if (expected instanceof Promise) {
+            expected = await expected;
+          }
+
           if (
-            awaitedActual.functionDescription.type !== FunctionType.SYMBOLIC &&
-            awaitedActual.functionDescription !== expected.functionDescription
+            expected?.functionDescription.type !== FunctionType.SYMBOLIC &&
+            expected?.functionDescription.type !== FunctionType.EMBEDDABLE
+          ) {
+            throw new Error(
+              'Expected function type to be either symbolic or embeddable'
+            );
+          }
+
+          const expectedFunctionName = expected?.functionDescription.name;
+          const expectedFunctionDocstring =
+            expected?.functionDescription.docstring;
+
+          if (
+            expected?.functionDescription.type !== FunctionType.SYMBOLIC &&
+            (expected?.functionDescription.name !== expectedFunctionName ||
+              expected?.functionDescription.docstring !==
+                expectedFunctionDocstring)
           ) {
             throw new Error(
               'Expected embedding function descriptions to match, but they did not. Embeddable functions must be aligned with invocations of the same function in order to train the embedding space.'
@@ -177,18 +179,48 @@ export class Tanuki {
         };
 
         const baseObj = {
-          toMatchObject: (expected: any) => baseExpectation(expected, true),
-          toEqual: (expected: any) => baseExpectation(expected, true),
-          toBe: (expected: any) => baseExpectation(expected, true),
+          toMatchObject: (
+            expected: Promise<{
+              functionDescription: FunctionDescription;
+              input: any[];
+            }>
+          ) => baseExpectation(expected, true),
+          toEqual: (
+            expected: Promise<{
+              functionDescription: FunctionDescription;
+              input: any[];
+            }>
+          ) => baseExpectation(expected, true),
+          toBe: (
+            expected: Promise<{
+              functionDescription: FunctionDescription;
+              input: any[];
+            }>
+          ) => baseExpectation(expected, true),
           toBeNull: () => baseExpectation(null, true),
         };
 
         return {
           ...baseObj,
           not: {
-            toMatchObject: (expected: any) => baseExpectation(expected, false),
-            toEqual: (expected: any) => baseExpectation(expected, false),
-            toBe: (expected: any) => baseExpectation(expected, false),
+            toMatchObject: (
+              expected: Promise<{
+                functionDescription: FunctionDescription;
+                input: any[];
+              }>
+            ) => baseExpectation(expected, false),
+            toEqual: (
+              expected: Promise<{
+                functionDescription: FunctionDescription;
+                input: any[];
+              }>
+            ) => baseExpectation(expected, false),
+            toBe: (
+              expected: Promise<{
+                functionDescription: FunctionDescription;
+                input: any[];
+              }>
+            ) => baseExpectation(expected, false),
             toBeNull: () => baseExpectation(null, false),
           },
         };
@@ -231,12 +263,11 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
     }
 
     // Return a function that takes an input of type InputType and returns a value of type OutputType
-    return async function (
-      this: { name: string; sourceFile: string },
-      input: InputType
-    ): Promise<OutputType> {
-      // eslint-disable-next-line @typescript-eslint/no-this-alias
-      const parentClass = this; // Doing this for readability
+    return async function (this: any, input: InputType): Promise<OutputType> {
+      const parentClass = this as unknown as {
+        name: string;
+        sourceFile: string;
+      }; // Doing this for readability
       const functionDescription = Register.getNamedFunctions(
         parentClass,
         docstring
@@ -245,7 +276,6 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
       let embeddingCase = false;
       if (config) {
         FunctionModeler.setConfig(functionDescription, config);
-        functionModeler.loadSymbolicAlignStatements(functionDescription.hash());
       }
 
       if (
@@ -256,21 +286,16 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
         embeddingCase = true;
       }
 
-      if (!config?.teacherModels) {
-        config = {
-          ...config,
-          teacherModels: embeddingCase
-            ? [DEFAULT_EMBEDDING_MODEL_NAME]
-            : DEFAULT_TEACHER_MODEL_NAMES,
-        };
+      if (!embeddingCase) {
+        functionModeler.loadSymbolicAlignStatements(functionDescription.hash());
       }
-      if (config && config.teacherModels && config?.teacherModels?.length > 0) {
-        FunctionModeler.configureTeacherModels(
-          config.teacherModels,
-          functionDescription.hash(),
-          functionDescription.type
-        );
-      }
+
+      FunctionModeler.configureFunctionModels(
+        functionDescription.hash(),
+        functionDescription.type,
+        config?.teacherModels || DEFAULT_TEACHER_MODEL_NAMES,
+        config?.studentModel || DEFAULT_DISTILLED_MODEL_NAME
+      );
 
       // Flag that we are within a tanuki.align block
       if (Tanuki.isWithinAlign()) {
@@ -289,13 +314,13 @@ export function patch<OutputType, InputType>(config?: PatchConfig) {
         )) as unknown as OutputType;
       } else {
         const response = (await languageModeler.call(
-          input,
+          input as any[],
           functionDescription,
           validator,
-          config.generationParams ?? {}
+          config?.generationParams ?? {}
         )) as unknown as OutputType;
 
-        return response;
+        return response as unknown as OutputType;
       }
     };
   };

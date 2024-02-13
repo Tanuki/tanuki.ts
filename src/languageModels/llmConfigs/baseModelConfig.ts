@@ -15,6 +15,7 @@ export class BaseModelConfig {
     startToken: string;
     endToken: string;
   };
+  baseModelForSft: string;
 
   constructor(config: {
     modelName: string;
@@ -35,8 +36,7 @@ export class BaseModelConfig {
       startToken: '',
       endToken: '',
     };
+    this.baseModelForSft = '';
     this.instructions = config.instructions || this.instructions;
   }
-
-  // Additional methods can be added here
 }

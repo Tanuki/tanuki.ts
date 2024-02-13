@@ -96,7 +96,9 @@ describe('TestOpenAIAPI', () => {
     const api = new OpenAIAPI();
 
     // Call the method under test
-    const result = await api.listFinetuned(1);
+    const result = await api.listFinetuned(
+        new OpenAIConfig({ modelName: 'test_model', contextLength: 112 }),
+        1);
 
     // Check that the length of the result matches the expected value
     expect(result.length).toBe(1);

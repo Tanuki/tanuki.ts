@@ -1,10 +1,7 @@
-import {FunctionExample} from "../../src/models/functionExample";
 import {APIManager} from "../../src/APIManager";
 import FunctionModeler from "../../src/functionModeler";
 import {IDatasetWorker} from "../../src/trackers/IDatasetWorker";
 import {FunctionType} from "../../src/models/functionType";
-import {BaseModelConfig} from "../../src/languageModels/llmConfigs/baseModelConfig";
-import {PatchConfig} from "../../src/models/patchConfig";
 import {FunctionDescription} from "../../src/models/functionDescription";
 import {DEFAULT_DISTILLED_MODEL_NAME, DEFAULT_STUDENT_MODELS, DEFAULT_TEACHER_MODELS} from "../../src/constants";
 import {OpenAIAPI} from "../../src/languageModels/openAIAPI";

@@ -1,7 +1,6 @@
-import LLMApi from './LLMApi';
 import { TogetherAIConfig } from './llmConfigs/togetherAIConfig';
-import LLMFinetuneAPI from './LLMFinetuneAPI';
-import { FinetuneJob } from '../models/finetuneJob';
+import { Inferable } from '../APIManager';
+import { BaseModelConfig } from './llmConfigs/baseModelConfig';
 
 // Assuming you have similar configurations as in the Python code
 const TOGETHER_AI_URL = 'https://api.together.xyz/inference';
@@ -94,7 +93,7 @@ interface ModelInfo {
   depth: Depth;
 }
 
-export class TogetherAIAPI implements LLMApi, LLMFinetuneAPI {
+export class TogetherAIAPI implements Inferable {
   private apiKey: string | undefined;
   private modelConfigs: Record<string, ModelInfo>;
 
@@ -104,7 +103,7 @@ export class TogetherAIAPI implements LLMApi, LLMFinetuneAPI {
   }
 
   public async generate(
-    model: TogetherAIConfig,
+    model: BaseModelConfig,
     systemMessage: string,
     prompt: string,
     kwargs: {
@@ -117,14 +116,12 @@ export class TogetherAIAPI implements LLMApi, LLMFinetuneAPI {
     } = {}
   ): Promise<string> {
     this.checkApiKey();
-
+    const modelName = typeof model === 'string' ? model : model.modelName;
     // Retrieving model configuration
-    if (!this.modelConfigs[model.modelName]) {
+    if (!this.modelConfigs[modelName]) {
       // Assuming `together.Models.info` is similar to OpenAI client usage
       // You might need to adjust this part based on your actual implementation
-      this.modelConfigs[model.modelName] = await this.fetchModelInfo(
-        model.modelName
-      );
+      this.modelConfigs[modelName] = await this.fetchModelInfo(modelName);
     }
 
     const generationParams: {
@@ -142,8 +139,8 @@ export class TogetherAIAPI implements LLMApi, LLMFinetuneAPI {
       maxNewTokens: kwargs.maxNewTokens,
     };
 
-    if ('stop' in this.modelConfigs[model.modelName].config) {
-      generationParams.stop = this.modelConfigs[model.modelName].config.stop;
+    if ('stop' in this.modelConfigs[modelName].config) {
+      generationParams.stop = this.modelConfigs[modelName].config.stop;
     }
     if (model.parsingHelperTokens?.endToken) {
       generationParams.stop = [model.parsingHelperTokens.endToken];
@@ -162,7 +159,7 @@ export class TogetherAIAPI implements LLMApi, LLMFinetuneAPI {
     }
 
     const requestParams = {
-      model: model.modelName,
+      model: modelName,
       ...generationParams,
       prompt: this.formatPrompt(model, systemMessage, prompt),
     };
@@ -294,20 +291,5 @@ export class TogetherAIAPI implements LLMApi, LLMFinetuneAPI {
         'TogetherAI API failed to fetch model info. Is your API key correct?'
       );
     }
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  finetune(...args: any[]): Promise<FinetuneJob> {
-    throw new Error('Finetuning not yet implemented for Together.');
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  getFinetuned(jobId: string, ...args: any[]): Promise<FinetuneJob> {
-    throw new Error('Finetuning not yet implemented for Together.');
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  listFinetuned(limit: number, ...args: any[]): Promise<FinetuneJob[]> {
-    throw new Error('Finetuning not yet implemented for Together.');
   }
 }

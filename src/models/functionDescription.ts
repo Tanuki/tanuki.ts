@@ -16,13 +16,13 @@ class FunctionDescription {
   constructor(
     name: string,
     docstring: string,
+    type: FunctionType = FunctionType.SYMBOLIC,
     parentName?: string,
     sourceFile?: string,
     inputTypeDefinition?: string,
     outputTypeDefinition?: string,
     inputTypeSchema?: JSONSchema,
-    outputTypeSchema?: JSONSchema,
-    type: FunctionType = FunctionType.SYMBOLIC
+    outputTypeSchema?: JSONSchema
   ) {
     this.name = name;
     this.docstring = docstring;

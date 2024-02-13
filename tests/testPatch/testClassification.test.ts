@@ -13,13 +13,13 @@ describe('Sentiment Analysis Tests', () => {
   it('align_classify_sentiment', async () => {
     Tanuki.align(async (it) => {
       it("Specify how our functions should behave.", async (expect) => {
-        expect(await ClassifierSentiment.classifySentimentPair(["I love you", "I love woo"])).toEqual('Good');
-        expect(await ClassifierSentiment.classifySentimentPair(["I hate you", "You're disgusting"])).toEqual('Bad');
-        expect(await ClassifierSentiment.classifySentimentPair(["Today is wednesday", "The dogs are running outside"])).toBeNull();
+        await expect(ClassifierSentiment.classifySentimentPair(["I love you", "I love woo"])).toEqual('Good');
+        await expect(ClassifierSentiment.classifySentimentPair(["I hate you", "You're disgusting"])).toEqual('Bad');
+        await expect(ClassifierSentiment.classifySentimentPair(["Today is wednesday", "The dogs are running outside"])).toBeNull();
 
-        expect(await ClassifierSentiment.classifySentiment("I love you")).toEqual('Good');
-        expect(await ClassifierSentiment.classifySentiment("I hate you")).toEqual('Bad');
-        expect(await ClassifierSentiment.classifySentiment("Wednesdays are in the middle of the week")).toBeNull();
+        await expect(ClassifierSentiment.classifySentiment("I love you")).toEqual('Good');
+        await expect(ClassifierSentiment.classifySentiment("I hate you")).toEqual('Bad');
+        await expect(ClassifierSentiment.classifySentiment("Wednesdays are in the middle of the week")).toBeNull();
       })
     })
   });

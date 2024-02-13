@@ -1,15 +1,13 @@
-import { OPENAI_PROVIDER } from '../../constants';
 import { BaseModelConfig } from './baseModelConfig';
+import { ANYSCALE_PROVIDER } from '../../constants';
 
-export class OpenAIConfig extends BaseModelConfig {
-  modelName: string;
-  provider: string = OPENAI_PROVIDER;
-  contextLength: number;
+class AnyscaleConfig extends BaseModelConfig {
   baseModelForSft: string;
   constructor(config: {
     modelName: string;
     contextLength: number;
     instructions?: string;
+    provider?: string;
     parsingHelperTokens?: { startToken: string; endToken: string };
     baseModelForSft?: string;
   }) {
@@ -17,12 +15,12 @@ export class OpenAIConfig extends BaseModelConfig {
       modelName: config.modelName,
       instructions: config.instructions,
       parsingHelperTokens: config.parsingHelperTokens,
-      provider: OPENAI_PROVIDER,
+      provider: ANYSCALE_PROVIDER,
       contextLength: config.contextLength,
-      chatTemplate: OpenAIConfig.prototype.chatTemplate,
+      chatTemplate: AnyscaleConfig.prototype.chatTemplate,
     });
-    this.modelName = config.modelName;
-    this.contextLength = config.contextLength;
     this.baseModelForSft = config.baseModelForSft || config.modelName;
   }
 }
+
+export { AnyscaleConfig };

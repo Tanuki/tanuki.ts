@@ -1,6 +1,6 @@
 {
   "name": "tanuki.ts",
-  "version": "0.1.4-rc-1",
+  "version": "0.2.0",
   "description": "TypeScript client for building LLM-powered applications",
   "main": "./lib/index.js",
   "type": "module",
